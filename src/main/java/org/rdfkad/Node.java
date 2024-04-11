@@ -1,6 +1,7 @@
 package org.rdfkad;
 
 import org.rdfkad.*;
+import org.rdfkad.datahandlers.hash;
 import org.rdfkad.functions.IDGenerator;
 import org.rdfkad.functions.XOR;
 import org.rdfkad.packets.HashPacket;
@@ -449,6 +450,20 @@ public class Node {
             }
 
         }
+    }
+    public HashPacket storeRDF(RDFDataPacket packet) {
+        // Computing SHA-1 hashes for each component
+        String subjectHash = hash.computeSHA1(packet.subject);
+        String predicateHash = hash.computeSHA1(packet.predicate);
+        String objectHash = hash.computeSHA1(packet.Object);
+
+        // Caching each component of the RDF packet using its SHA-1 hash as key
+        overlayTable.put(subjectHash, packet.subject);
+        overlayTable.put(predicateHash, packet.predicate);
+        overlayTable.put(objectHash, packet.Object);
+
+
+        return new HashPacket(objectHash,predicateHash,subjectHash);
     }
     public  void connectNearby(){
         int minDistance = Integer.MAX_VALUE;

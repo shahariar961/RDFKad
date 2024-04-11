@@ -4,7 +4,7 @@ package org.rdfkad.packets;
 import java.io.Serializable;
 public class RoutingPacket implements Serializable{
     public Integer port;
-    boolean flag;
+    public boolean flag;
     public Integer distance;
     public RoutingPacket(Integer port, boolean flag){
         this.port = port;
