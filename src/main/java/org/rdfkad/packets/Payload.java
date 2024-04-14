@@ -9,29 +9,29 @@ public class Payload implements Serializable {
     String dataValue;
 
     public String request;
-    public boolean flag;
 
 
-    public Payload(String request,String nodeId,Integer port, String dataId,String dataValue,boolean flag){
+
+    public Payload(String request,String nodeId,Integer port, String dataId,String dataValue){
         this.request=request;
         this.nodeId=nodeId;
         this.port = port;
         this.dataId=dataId;
         this.dataValue=dataValue;
-        this.flag=flag;
+
     }
-    public Payload(String request,String nodeId,Integer port, String dataId,boolean flag){
+    public Payload(String request,String nodeId,Integer port, String dataId){
         this.request=request;
         this.nodeId=nodeId;
         this.port = port;
         this.dataId=dataId;
-        this.flag=flag;
+
     }
-    public Payload(String request,String nodeId,Integer port,boolean flag){
+    public Payload(String request,String nodeId,Integer port){
         this.request=request;
         this.nodeId=nodeId;
         this.port = port;
-        this.flag=flag;
+
     }
 }
 

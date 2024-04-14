@@ -6,13 +6,11 @@ public class RoutingPacket implements Serializable{
     public Integer port;
     public boolean flag;
     public Integer distance;
-    public RoutingPacket(Integer port, boolean flag){
+    public RoutingPacket(Integer port){
         this.port = port;
-        this.flag = flag;
-    }
-    public RoutingPacket(Integer port, boolean flag,Integer distance){
+            }
+    public RoutingPacket(Integer port,Integer distance){
         this.port = port;
-        this.flag = flag;
         this.distance=distance;
     }
 }

@@ -1,6 +1,7 @@
 package org.rdfkad;
 
 import org.rdfkad.*;
+import org.rdfkad.datahandlers.ConnectionHandler;
 import org.rdfkad.datahandlers.hash;
 import org.rdfkad.functions.IDGenerator;
 import org.rdfkad.functions.XOR;
@@ -32,7 +33,7 @@ public class Node {
 
     private Map<String, Object> overlayTable = new HashMap<>();
 
-    private boolean flag= false;
+
 
     public Node() {
 
@@ -60,22 +61,12 @@ public class Node {
     }
 
     public void listenForConnections() {
-
         while (true) {
             try {
                 Socket clientSocket = serverSocket.accept();
-                receiveData(clientSocket);
-
-
                 System.out.println("Accepted connection from Node on port " + clientSocket.getPort());
-
-                // Receive data from the connected node
-//                receiveData(clientSocket);
-
-//                Payload receivedObject = (Payload)inputStream.readObject();
-
-
-
+                ConnectionHandler connectionHandler = new ConnectionHandler(clientSocket, routingTableMap);
+                connectionHandler.handleConnection();
 
             } catch (IOException e) {
                 e.printStackTrace();
@@ -94,21 +85,22 @@ public class Node {
                 RDFDataPacket RDFPacket = new RDFDataPacket(packet);
                 System.out.println(RDFPacket.subject + " " + RDFPacket.predicate + " " + RDFPacket.Object);
 
-                overlayInitiator(RDFPacket);
+
+                //overlayInitiator(RDFPacket);
 
             }
             if (received instanceof RDFDataPacket) {
                 RDFDataPacket RDFPacket = (RDFDataPacket) received;
                 System.out.println(RDFPacket.subject + " " + RDFPacket.predicate + " " + RDFPacket.Object);
 
-                overlayInitiator(RDFPacket);
+                //overlayInitiator(RDFPacket);
             }
             if (received instanceof Payload){
                 Payload receivedMessage = (Payload) received;
                 System.out.println(receivedMessage.request);
                 if (!routingTableMap.containsKey(receivedMessage.nodeId)){
                     System.out.println("Unknown Node Connecting, inserting Node Id in Routing Table");
-                    RoutingPacket packet =new RoutingPacket(receivedMessage.port, receivedMessage.flag);
+                    RoutingPacket packet =new RoutingPacket(receivedMessage.port);
                     routingTableMap.put(receivedMessage.nodeId,packet);
                     KBucket();
                 }
@@ -272,7 +264,7 @@ public class Node {
 //            String nodeInfo = (nodeId + "," + port);
 //            outputStream.writeObject(nodeInfo);
 //            outputStream.writeObject(routingTable);
-            Payload messagePayload= new Payload(query,nodeId,nodePort,dataId,flag);
+            Payload messagePayload= new Payload(query,nodeId,nodePort,dataId);
 //            System.out.println(messagePayload.request);
             outputStream.writeObject(messagePayload);
             Object receivedObject = null;
@@ -303,7 +295,7 @@ public class Node {
 //            String nodeInfo = (nodeId + "," + port);
 //            outputStream.writeOQject(nodeInfo);
 //            outputStream.writeObject(routingTable);
-            Payload messagePayload= new Payload(query,nodeId,nodePort,flag);
+            Payload messagePayload= new Payload(query,nodeId,nodePort);
 //            System.out.println(messagePayload.request);
             outputStream.writeObject(messagePayload);
             Object receivedObject = null;
@@ -376,7 +368,7 @@ public class Node {
                 Map.Entry<String, Integer> entry = minHeap.poll();
                 Integer distance = entry.getValue();
                 RoutingPacket packet = routingTableMap.get(entry.getKey());
-                RoutingPacket distancePacket = new RoutingPacket(packet.port, packet.flag, packet.distance);
+                RoutingPacket distancePacket = new RoutingPacket(packet.port, packet.distance);
                 Bucket.put(entry.getKey(), distancePacket);
                 System.out.println("Added node into bucket" + entry.getKey());
             }
@@ -423,34 +415,7 @@ public class Node {
 //    }
 
 
-    public void overlayInitiator(RDFDataPacket packet) {
-        if (flag) {
-            System.out.println("Hashpacket sent");
-            HashPacket hashInfo=storeRDF(packet);
-            System.out.println("Hash Recieved");
-            String dataId= IDGenerator.generateID(nodeId,dataTable);
-            System.out.println("ID Recieved" + dataId);
-            dataTable.put(dataId,hashInfo);
-            System.out.println("RDF Data stored in table ID:" + dataId );
 
-        } else {
-            Map.Entry<String, RoutingPacket> entryFlag = null;
-            for (Map.Entry<String, RoutingPacket> entry : Bucket.entrySet()) {
-                RoutingPacket routingInfo = entry.getValue();
-                if (routingInfo.flag) {
-                    entryFlag = entry;
-                    break;
-                }
-            }
-            if (entryFlag != null) {
-                sendRDF(entryFlag.getValue(),packet);
-            } else {
-                flag = true;
-                overlayInitiator(packet);
-            }
-
-        }
-    }
     public HashPacket storeRDF(RDFDataPacket packet) {
         // Computing SHA-1 hashes for each component
         String subjectHash = hash.computeSHA1(packet.subject);
