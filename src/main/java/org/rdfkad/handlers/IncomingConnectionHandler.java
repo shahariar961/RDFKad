@@ -1,4 +1,4 @@
-package org.rdfkad.datahandlers;
+package org.rdfkad.handlers;
 
 import org.rdfkad.functions.XOR;
 import org.rdfkad.packets.Payload;
@@ -6,18 +6,19 @@ import org.rdfkad.packets.RDFDataPacket;
 import org.rdfkad.packets.RoutingPacket;
 
 import java.io.*;
+import java.math.BigInteger;
 import java.net.Socket;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 import java.util.stream.Collectors;
 
-public class ConnectionHandler {
+public class IncomingConnectionHandler {
     private Socket socket;
     private Map<String, RoutingPacket> routingTableMap;
     private static final int BIT_SPACE = 12;
 
-    public ConnectionHandler(Socket socket, Map<String, RoutingPacket> routingTableMap) {
+    public IncomingConnectionHandler(Socket socket, Map<String, RoutingPacket> routingTableMap) {
         this.socket = socket;
         this.routingTableMap = routingTableMap;
     }
@@ -68,21 +69,21 @@ public class ConnectionHandler {
                     System.out.println("Unknown Node Connecting, inserting Node Id in Routing Table");
                     RoutingPacket packet =new RoutingPacket(receivedObjectMessage.port);
                     routingTableMap.put(receivedObjectMessage.nodeId,packet);
-                    KBucket();
-                }
-                if(receivedObjectMessage.request.equals("get")) {
-                    System.out.println("Data Get Request");
-                    if(dataTable.containsKey(receivedObjectMessage.dataId)) {
-                        System.out.println("Data Found in Hash Table");
-                        outputStream.writeObject(dataTable.get(receivedObjectMessage.dataId));
-                        System.out.println("Sending Data");
-                        outputStream.flush();
 
-
-                    }else {
-                        outputStream.writeObject("Data not found");
-                    }
                 }
+//                if(receivedObjectMessage.request.equals("get")) {
+//                    System.out.println("Data Get Request");
+//                    if(dataTable.containsKey(receivedObjectMessage.dataId)) {
+//                        System.out.println("Data Found in Hash Table");
+//                        outputStream.writeObject(dataTable.get(receivedObjectMessage.dataId));
+//                        System.out.println("Sending Data");
+//                        outputStream.flush();
+//
+//
+//                    }else {
+//                        outputStream.writeObject("Data not found");
+//                    }
+//                }
                 if (receivedObjectMessage.request.equals("find")) {
                     System.out.println("Sending Routing Data");
                     outputStream.writeObject(routingTableMap);
@@ -92,8 +93,8 @@ public class ConnectionHandler {
                     HashMap<String,Integer> xorDistances = new HashMap<String,Integer>();
                     for (Map.Entry<String, RoutingPacket> entry : routingTableMap.entrySet()) {
                         String nodeId = entry.getKey();
-                        int distance = XOR.Distance(receivedObjectMessage.nodeId, nodeId); // Assuming XOR is the class with calculateXORDistance method
-                        xorDistances.put(nodeId, distance);
+                        BigInteger distance = XOR.Distance(receivedObjectMessage.nodeId, nodeId); // Assuming XOR is the class with calculateXORDistance method
+
                     }
 
                     // Select the 8 smallest XOR distances
@@ -143,7 +144,7 @@ public class ConnectionHandler {
 
                     }
                 }
-                KBucket();
+
             }
 
 

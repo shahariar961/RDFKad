@@ -1,7 +1,13 @@
 
 package org.rdfkad;
 
+import org.rdfkad.functions.XOR;
+import org.rdfkad.packets.RoutingPacket;
+
+import java.math.BigInteger;
 import java.util.*;
+
+
 
 public class Bucket {
     private final String nodeId;
@@ -11,29 +17,31 @@ public class Bucket {
     public Bucket(String nodeId, HashMap<String, RoutingPacket> routingTable, int bucketCount) {
         this.nodeId = nodeId;
         this.routingTable = routingTable;
-        this.buckets = new ArrayList<>(Collections.nCopies(bucketCount, new HashSet<>()));
-        sortIntoBuckets();
+        this.buckets = new ArrayList<>(bucketCount);
+        for (int i = 0; i < bucketCount; i++) {
+            this.buckets.add(new HashSet<>());
+        }
     }
 
-    private void sortIntoBuckets() {
+    public void sortIntoBuckets() {
         for (String otherNodeId : routingTable.keySet()) {
-            int distance = getDistance(this.nodeId, otherNodeId);
+            BigInteger distance = XOR.Distance(this.nodeId, otherNodeId);
             int bucketIndex = getLeadingZeros(distance);
             buckets.get(bucketIndex).add(otherNodeId);
         }
     }
 
-    private int getDistance(String nodeId1, String nodeId2) {
-        // Assuming nodeId1 and nodeId2 are binary strings
-        int xor = Integer.parseInt(nodeId1, 2) ^ Integer.parseInt(nodeId2, 2);
-        return xor;
+    // Adjusted to a 12-bit identifier space
+    public int getLeadingZeros(BigInteger distance) {
+        int highestSetBit = distance.bitLength() - 1;  // Calculates the highest set bit
+        return 11 - highestSetBit ;  // Adjust the calculation for a 12-bit space
     }
 
-    private int getLeadingZeros(int number) {
-        return Integer.numberOfLeadingZeros(number);
-    }
-
-    public List<Set<String>> getBuckets() {
-        return buckets;
+    public List<Integer> getBucketSizes() {
+        List<Integer> sizes = new ArrayList<>();
+        for (Set<String> bucket : buckets) {
+            sizes.add(bucket.size());
+        }
+        return sizes;
     }
 }

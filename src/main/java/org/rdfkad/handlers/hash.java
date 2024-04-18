@@ -1,4 +1,4 @@
-package org.rdfkad.datahandlers;
+package org.rdfkad.handlers;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;

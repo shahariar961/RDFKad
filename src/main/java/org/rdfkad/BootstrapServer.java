@@ -7,9 +7,8 @@ import java.net.Socket;
 import java.util.HashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.net.InetAddress;
 import java.io.IOException;
-import org.rdfkad.datahandlers.ConnectionHandler;
+import org.rdfkad.handlers.IncomingConnectionHandler;
 
 
 
@@ -31,7 +30,7 @@ public class BootstrapServer {
 
             while (true) {
                 Socket clientSocket = serverSocket.accept();
-                ConnectionHandler connectionHandler = new ConnectionHandler(clientSocket, routingTableMap);
+                IncomingConnectionHandler connectionHandler = new IncomingConnectionHandler(clientSocket, routingTableMap);
                 executorService.submit(connectionHandler::handleConnection);
             }
         } catch (IOException e) {
