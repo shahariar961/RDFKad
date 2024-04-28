@@ -42,7 +42,7 @@ public class RDFStore {
         }
     }
 
-    private String get12BitHash(String input) throws NoSuchAlgorithmException {
+    public String get12BitHash(String input) throws NoSuchAlgorithmException {
         MessageDigest md = MessageDigest.getInstance("SHA-256");
         md.update(input.getBytes(StandardCharsets.UTF_8));
         byte[] digest = md.digest();

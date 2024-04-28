@@ -3,20 +3,22 @@ package org.rdfkad;
 
 import org.rdfkad.functions.XOR;
 import org.rdfkad.packets.RoutingPacket;
+import org.rdfkad.tables.RoutingTable;
 
 import java.math.BigInteger;
 import java.util.*;
-
+import java.util.concurrent.ConcurrentHashMap;
 
 
 public class Bucket {
     private final String nodeId;
-    private final HashMap<String, RoutingPacket> routingTable;
+    private final ConcurrentHashMap<String, RoutingPacket> routingTable;
     private final List<Set<String>> buckets;
+    RoutingTable routingTableInstance  = RoutingTable.getInstance();
 
     public Bucket(String nodeId, HashMap<String, RoutingPacket> routingTable, int bucketCount) {
         this.nodeId = nodeId;
-        this.routingTable = routingTable;
+        this.routingTable = routingTableInstance.getMap();
         this.buckets = new ArrayList<>(bucketCount);
         for (int i = 0; i < bucketCount; i++) {
             this.buckets.add(new HashSet<>());
@@ -43,5 +45,8 @@ public class Bucket {
             sizes.add(bucket.size());
         }
         return sizes;
+    }
+    public List<Set<String>> getBuckets() {
+        return this.buckets;
     }
 }

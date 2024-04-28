@@ -1,29 +1,38 @@
 package org.rdfkad.tables;
 
-import java.io.Serializable;
 
-public class RoutingTable implements Serializable {
-    private String nodeId;
-    private int port;
+import org.rdfkad.packets.RoutingPacket;
 
-    public RoutingTable(String nodeId, int port) {
-        this.nodeId = nodeId;
-        this.port = port;
+import java.util.concurrent.ConcurrentHashMap;
+
+public class RoutingTable {
+    // Single instance of RoutingTable
+    private static RoutingTable single_instance = null;
+
+    // The ConcurrentHashMap for the routing table
+    private ConcurrentHashMap<String, RoutingPacket> routingMap;
+
+    // Private constructor to restrict instantiation from other classes
+    private RoutingTable() {
+        routingMap = new ConcurrentHashMap<>();
     }
 
-    public String getNodeId() {
-        return nodeId;
+    // Static method to get the instance of the RoutingTable class
+    public static RoutingTable getInstance() {
+        if (single_instance == null) {
+            synchronized (RoutingTable.class) {
+                if (single_instance == null) {
+                    single_instance = new RoutingTable();
+                }
+            }
+        }
+        return single_instance;
     }
 
-    public int getPort() {
-        return port;
+    // Method to get the concurrent hash map
+    public ConcurrentHashMap<String, RoutingPacket> getMap() {
+        return routingMap;
     }
 
-    @Override
-    public String toString() {
-        return "RoutingTable{" +
-                "nodeId='" + nodeId + '\'' +
-                ", port=" + port +
-                '}';
-    }
+    // Additional methods to manipulate the routing table can be added here
 }

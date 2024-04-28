@@ -1,7 +1,7 @@
 package org.rdfkad.handlers;
 
+import org.rdfkad.Node;
 import org.rdfkad.packets.Payload;
-import org.rdfkad.packets.RDFDataPacket;
 import org.rdfkad.packets.RoutingPacket;
 
 import java.io.IOException;
@@ -10,34 +10,50 @@ import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.net.UnknownHostException;
 
-import org.rdfkad.packets.Payload;
-import org.rdfkad.packets.RDFDataPacket;
-import org.rdfkad.packets.RoutingPacket;
+import org.rdfkad.tables.DataTable;
+import org.rdfkad.tables.RoutingTable;
 
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.net.Socket;
-import java.net.UnknownHostException;
-import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 
 public class OutgoingConnectionHandler {
+
+    private Node node;
+    public OutgoingConnectionHandler(Node node) {
+        this.node = node;
+    }
     private static String nodeId;
-    private static int nodePort;
+    private static int nodePort = Node.getNodePort();
 
-    public static void connectToNode(String host, RoutingPacket packet, String dataId, String query) {
+    private  ConcurrentHashMap <String, RoutingPacket> routingTable= RoutingTable.getInstance().getMap();
+    private  ConcurrentHashMap<String, Object> dataTable = DataTable.getInstance().getMap();
+
+
+    public  String connectToNode(String request, String nodeId, String dataId) throws IOException {
+        RoutingPacket routingPacket = routingTable.get(nodeId);
+        if (routingPacket == null) {
+            throw new IOException("No routing information available for nodeId: " + nodeId);
+        }
         try {
-            Socket socket = new Socket(host, packet.port);
+
+            Socket socket = new Socket(routingPacket.getHost(), RoutingPacket.getPort());
             ObjectOutputStream outputStream = new ObjectOutputStream(socket.getOutputStream());
             ObjectInputStream inputStream = new ObjectInputStream(socket.getInputStream());
 
-            Payload messagePayload= new Payload(query,nodeId,nodePort,dataId);
+            Payload messagePayload= new Payload(request,nodeId,nodePort,dataId);
             outputStream.writeObject(messagePayload);
             Object receivedObject = null;
             try {
                 receivedObject = inputStream.readObject();
-                if (receivedObject instanceof String){
+                Payload receivedPayload = (Payload) receivedObject;
+                if (receivedPayload.getRequest().equals("found")) {
+                    dataTable.put(dataId, receivedPayload.getData());
                     System.out.println(receivedObject);
+                    return "Data found";
+                }else if (receivedPayload.getRequest().equals("not found")) {
+
+                    return null;
                 }
             } catch (ClassNotFoundException e) {
                 throw new RuntimeException(e);
@@ -47,73 +63,43 @@ public class OutgoingConnectionHandler {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+        return null;
     }
 
-    public void connectToNode(String host, RoutingPacket packet,String query) {
-        try {
-            Socket socket = new Socket(host, packet.port);
-            ObjectOutputStream outputStream = new ObjectOutputStream(socket.getOutputStream());
-            ObjectInputStream inputStream = new ObjectInputStream(socket.getInputStream());
 
-            Payload messagePayload= new Payload(query,nodeId,nodePort);
-            outputStream.writeObject(messagePayload);
-            Object receivedObject = null;
-            try {
-                receivedObject = inputStream.readObject();
-                if (receivedObject instanceof String){
-                    System.out.println(receivedObject);
-                }
-            } catch (ClassNotFoundException e) {
-                throw new RuntimeException(e);
-            }
-        }  catch (UnknownHostException e) {
-            throw new RuntimeException(e);
-        } catch (IOException  e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public static void sendRDF( RoutingPacket RoutingInfo, RDFDataPacket packet) {
-        try (Socket socket = new Socket("localhost", RoutingInfo.port);
-             ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream())) {
-
-            oos.writeObject(packet);
-            System.out.println("RDF Packet sent: " + packet);
-
-        } catch (IOException e) {
-            System.err.println("Error sending RDF packet: " + e.getMessage());
-            e.printStackTrace();
-        }
-    }
-
-    public void connectToBootstrapServer(String host, int port, HashMap<String, RoutingPacket> routingTableMap) {
+    public void connectToBootstrapServer(String request,String host, int port) {
         try (Socket socket = new Socket(host, port);
              ObjectOutputStream outputStream = new ObjectOutputStream(socket.getOutputStream());
              ObjectInputStream inputStream = new ObjectInputStream(socket.getInputStream())) {
-            String nodeInfo = (nodeId + "," + nodePort);
-            outputStream.writeObject(nodeInfo);
+            Payload messagePayload= new Payload(request,Node.getNodeId(),Node.getNodePort());
+            outputStream.writeObject(messagePayload);
 
             Object receivedObject = inputStream.readObject();
-            if (receivedObject instanceof String) {
-                String receivedNodeId=(String) receivedObject;
-                if (nodeId.equals("null")){
-                    nodeId=receivedNodeId;
-                    System.out.println("Recieved ID: " + nodeId);
-                    System.out.println("------------------------");
+            if (receivedObject instanceof Payload) {
+                Payload receivedPayload =(Payload) receivedObject;
+                if (receivedPayload.getRequest().equals("registered")) {
+                    nodeId= receivedPayload.getNodeId();
+                    node.setNodeId(nodeId);
+                    node.setMulticastId(receivedPayload.getMulticastId());
+                    System.out.println("Register to Network with ID :"+receivedPayload.getNodeId() +"Multicast id :" + receivedPayload.getMulticastId());
+                    ConcurrentHashMap<String, RoutingPacket> tempRoutingTable = receivedPayload.getRoutingTable();
+                    for (Map.Entry<String, RoutingPacket> entry : tempRoutingTable.entrySet()) {
+                        if (!entry.getKey().equals(nodeId)) {
+                            routingTable.putIfAbsent(entry.getKey(), entry.getValue());
+                        }
+                    }
+
+
                 }
-            }
-            Object receivedObject2 = inputStream.readObject();
-            if (receivedObject2 instanceof HashMap<?, ?>) {
-                HashMap<String, RoutingPacket> recievedHashMap = (HashMap<String, RoutingPacket>) receivedObject2;
-                if (!recievedHashMap.isEmpty()){
-                    routingTableMap = recievedHashMap;
-                }
-                for (HashMap.Entry<String, RoutingPacket> entry : recievedHashMap.entrySet()) {
-                    String nodeId2 = entry.getKey();
-                    RoutingPacket packet = entry.getValue();
-                    System.out.println("Node ID: " + nodeId2);
-                    System.out.println("Data Port: " + packet.port);
-                    System.out.println("------------------------");
+                if (receivedPayload.getRequest().equals("routing info")) {
+                    ConcurrentHashMap<String, RoutingPacket> tempRoutingTable = receivedPayload.getRoutingTable();
+                    for (Map.Entry<String, RoutingPacket> entry : tempRoutingTable.entrySet()) {
+                        if (!entry.getKey().equals(nodeId)) {
+                            routingTable.putIfAbsent(entry.getKey(), entry.getValue());
+                        }
+                    }
+
+
                 }
             }
         } catch (IOException e) {

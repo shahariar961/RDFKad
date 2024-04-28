@@ -2,11 +2,12 @@ package org.rdfkad;
 
 import org.rdfkad.handlers.IncomingConnectionHandler;
 import org.rdfkad.handlers.OutgoingConnectionHandler;
-import org.rdfkad.handlers.hash;
-import org.rdfkad.functions.XOR;
-import org.rdfkad.packets.HashPacket;
-import org.rdfkad.packets.RDFDataPacket;
+import org.rdfkad.multicast.SensorMulticastReceiver;
 import org.rdfkad.packets.RoutingPacket;
+import org.rdfkad.tables.DataTable;
+import org.rdfkad.tables.RoutingTable;
+
+import java.util.concurrent.ConcurrentHashMap;
 
 import java.io.*;
 import java.net.ServerSocket;
@@ -20,25 +21,15 @@ import java.util.concurrent.Executors;
 public class Node {
     private BlockingQueue<List<String>> dataQueue;
     private ServerSocket serverSocket;
-    private String nodeId="null";
+    private static ConcurrentHashMap<String, RoutingPacket> routingTable = RoutingTable.getInstance().getMap();
+    private ConcurrentHashMap<String, Object> dataTable = DataTable.getInstance().getMap();
+    private static String nodeId="null";
+
+    private static Integer multicastId=0;
+
     private static Integer nodePort;
-    private HashMap<String, RoutingPacket> routingTableMap;
+    private final List<Set<String>> bucket;
 
-    private Hashtable<String,Object> dataTable;
-    private HashMap<String,RoutingPacket> Bucket;
-
-    private Map<String, Object> overlayTable = new HashMap<>();
-
-    public BlockingQueue<List<String>> getDataQueue() {
-        return dataQueue;
-    }
-
-    public Node() {
-        this.dataQueue = new ArrayBlockingQueue<>(10);
-        this.dataTable = new Hashtable<>();
-        this.Bucket=new HashMap<>();
-        this.routingTableMap=new HashMap<>();
-    }
 
     public void startServer(int port) {
         try {
@@ -47,6 +38,7 @@ public class Node {
 
             ExecutorService executorService = Executors.newCachedThreadPool();
             executorService.submit(this::listenForConnections);
+            executorService.submit(new SensorMulticastReceiver());
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -57,7 +49,7 @@ public class Node {
             try {
                 Socket clientSocket = serverSocket.accept();
                 System.out.println("Accepted connection from Node on port " + clientSocket.getPort());
-                IncomingConnectionHandler connectionHandler = new IncomingConnectionHandler(clientSocket, routingTableMap);
+                IncomingConnectionHandler connectionHandler = new IncomingConnectionHandler(clientSocket);
                 connectionHandler.handleConnection();
             } catch (IOException e) {
                 e.printStackTrace();
@@ -65,33 +57,33 @@ public class Node {
         }
     }
 
-    public void connectToBootstrapServer(String host, int port) {
-        OutgoingConnectionHandler handler = new OutgoingConnectionHandler();
-        handler.connectToBootstrapServer(host, port, routingTableMap);
+    public void connectToBootstrapServer(String request,String host, int port) {
+        OutgoingConnectionHandler handler = new OutgoingConnectionHandler(this);
+        handler.connectToBootstrapServer(request,host, port);
     }
-
     public static void main(String[] args) {
         Node node = new Node();
         if (args.length != 1) {
             System.out.println("Usage: java Node <port>");
             System.exit(1);
         }
-        int nodePort = Integer.parseInt(args[0]);
+        nodePort = Integer.parseInt(args[0]);
         node.startServer(nodePort);
 
         BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
         while (true) {
             try {
+                node.connectToBootstrapServer("register","localhost", 9090);
                 System.out.print("Enter command (search data <data Id> or connect server <port> or store data <Id> <Value>): ");
                 String command = reader.readLine().trim();
 
                 if (command.startsWith("connect server")) {
-                    node.connectToBootstrapServer("localhost", 9090);
+                    node.connectToBootstrapServer("register","localhost", 9090);
                 } else if (command.startsWith("show routing")) {
-                    if (node.routingTableMap.isEmpty()){
+                    if (routingTable.isEmpty()){
                         System.out.println("Routing table is empty");
                     }else {
-                        for (Map.Entry<String,RoutingPacket> entry : node.routingTableMap.entrySet()){
+                        for (Map.Entry<String,RoutingPacket> entry : routingTable.entrySet()){
                             System.out.println(entry.getKey());
                         }
                     }
@@ -102,5 +94,29 @@ public class Node {
                 e.printStackTrace();
             }
         }
+    }
+
+    public  void  setMulticastId(int multicastId) {
+        this.multicastId = multicastId;
+    }
+
+    public static String getNodeId() {
+        return nodeId;
+    }
+
+    public void setNodeId(String nodeId) {
+        this.nodeId = nodeId;
+    }
+
+    public static Integer getMulticastId() {
+        return multicastId;
+    }
+
+    public static Integer getNodePort() {
+        return nodePort;
+    }
+    public Node() {
+        this.dataQueue = new ArrayBlockingQueue<>(10);
+        this.bucket = new ArrayList<>();
     }
 }
