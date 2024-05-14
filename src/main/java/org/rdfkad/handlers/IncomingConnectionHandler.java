@@ -49,6 +49,21 @@ public class IncomingConnectionHandler {
 
                     }
 
+                } else if (receivedPayload.getRequest().equals("store")) {
+                    if (routingTable.containsKey(receivedPayload.getDataId())) {
+                        dataTable.put(receivedPayload.getDataId(),receivedPayload.getDataValue());
+                        System.out.println("Data id "+ receivedPayload.getDataId()+"stored successfully");
+                        Payload messagePayload = new Payload("modfied", receivedPayload.getNodeId(), receivedPayload.getPort(), receivedPayload.getDataId());
+                        outputStream.writeObject(messagePayload);
+
+                        // Handle the case where the data ID exists in the routing table
+                        // You can add your specific logic here if needed
+                    } else {
+                        dataTable.put(receivedPayload.getDataId(), receivedPayload.getDataValue());
+                        System.out.println("Data id "+ receivedPayload.getDataId()+"stored successfully");
+                        Payload messagePayload = new Payload("stored", receivedPayload.getNodeId(), receivedPayload.getPort(), receivedPayload.getDataId());
+                        outputStream.writeObject(messagePayload);
+                    }
                 }
 
             }
@@ -82,9 +97,10 @@ public class IncomingConnectionHandler {
                     System.out.println("Node registered with ID: " + generatedNodeId +"Multicast id :" + multicastId);
 
                 }
-                if (receivedPayload.getRequest().equals("routing help")) {
-                    Payload messagePayload = new Payload("registered", receivedPayload.getNodeId(), routingTable);
+                if (receivedPayload.getRequest().equals("refresh routing")) {
+                    Payload messagePayload = new Payload("refresh routing", receivedPayload.getNodeId(), routingTable);
                     outputStream.writeObject(messagePayload);
+                    System.out.println("Sent routing data to Node:" + receivedPayload.getNodeId());
 
                 }
 

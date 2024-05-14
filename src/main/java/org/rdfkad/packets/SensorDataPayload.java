@@ -4,12 +4,14 @@ import java.io.Serializable;
 
 public class SensorDataPayload  implements Serializable {
     private int uniqueId;  // Unique identifier for the payload
-    private RDFPacket rdfData;   // RDF data as a string
+    private RDFPacket rdfData;
+    private String request;// RDF data as a string
 
     // Constructor
-    public SensorDataPayload( int uniqueId, RDFPacket rdfData) {
+    public SensorDataPayload( int uniqueId, RDFPacket rdfData, String request) {
         this.uniqueId = uniqueId;
         this.rdfData = rdfData;
+        this.request=request;
     }
 
     // Getters and setters
@@ -17,15 +19,13 @@ public class SensorDataPayload  implements Serializable {
         return uniqueId;
     }
 
-    public void setUniqueId(int uniqueId) {
-        this.uniqueId = uniqueId;
-    }
 
     public RDFPacket getRdfData() {
         return rdfData;
     }
 
-    public void setRdfData(RDFPacket rdfData) {
-        this.rdfData = rdfData;
+
+    public String getRequest() {
+        return request;
     }
 }

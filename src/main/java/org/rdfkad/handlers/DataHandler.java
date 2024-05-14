@@ -1,57 +1,80 @@
-//package org.rdfkad.handlers;
-//
-//import org.rdfkad.functions.XOR;
-//import org.rdfkad.packets.HashPacket;
-//import org.rdfkad.packets.RDFDataPacket;
-//import org.rdfkad.packets.RoutingPacket;
-//
-//import java.math.BigInteger;
-//import java.util.HashMap;
-//import java.util.Hashtable;
-//import java.util.Map;
-//
-//public class DataHandler {
-//    private HashMap<String, RoutingPacket> routingTableMap;
-//    private Hashtable<String,Object> dataTable;
-//    private Map<String, Object> overlayTable;
-//    public void searchData(String dataAddress) {
-//        // Calculate XOR distance between the target data address and IDs in the routing table
-//        int minDistance = Integer.MAX_VALUE;
-//        String closestNodeId = null;
-//
-//        for (Map.Entry<String, RoutingPacket> entry : routingTableMap.entrySet()) {
-//            String nodeId = entry.getKey();
-//            BigInteger distance = XOR.Distance(dataAddress, nodeId);
-//
-////            if (distance < minDistance) {
-////                minDistance = distance;
-////                closestNodeId = nodeId;
-////            }
-//        }
-//
-//        // Contact the closest node for data retrieval
-//        if (closestNodeId != null) {
-//            OutgoingConnectionHandler.connectToNode("localhost",routingTableMap.get(closestNodeId), dataAddress,"get");
-//        } else {
-//            System.out.println("No nodes in the routing table. Unable to search for data.");
-//        }
-//    }
-////    private void inputData(String dataId, String dataValue){
-////        data Table.put(dataId,dataValue);
-////        System.out.println("Stored Data ID:" +dataId + ", Value:" + dataValue);
-////    }
-//    public HashPacket storeRDF(RDFDataPacket packet) {
-//        // Computing SHA-1 hashes for each component
-//        String subjectHash = hash.computeSHA1(packet.subject);
-//        String predicateHash = hash.computeSHA1(packet.predicate);
-//        String objectHash = hash.computeSHA1(packet.Object);
-//
-//        // Caching each component of the RDF packet using its SHA-1 hash as key
-//        overlayTable.put(subjectHash, packet.subject);
-//        overlayTable.put(predicateHash, packet.predicate);
-//        overlayTable.put(objectHash, packet.Object);
-//
-//
-//        return new HashPacket(objectHash,predicateHash,subjectHash);
-//    }
-//}
+package org.rdfkad.handlers;
+
+import org.rdfkad.Bucket;
+import org.rdfkad.functions.XOR;
+import org.rdfkad.packets.HashPacket;
+import org.rdfkad.packets.RDFPacket;
+import org.rdfkad.packets.RoutingPacket;
+import org.rdfkad.tables.NodeConfig;
+import org.rdfkad.tables.RoutingTable;
+
+import java.io.IOException;
+import java.math.BigInteger;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+public class DataHandler {
+    private final String ownNodeId = NodeConfig.getInstance().getNodeId();
+
+    private final List <Set<String>> bucket;
+
+
+    public DataHandler() {
+
+        this.bucket = Bucket.getInstance().getBuckets();
+
+    }
+
+    public void sendData(String dataId, Object payload) throws IOException {
+
+        // Calculate the XOR distance between the data ID and own node ID
+        BigInteger xorDistance = XOR.Distance(dataId, ownNodeId);
+        int leadingZeroIndex = Bucket.getLeadingZeros(xorDistance);
+
+        Set<String> targetBucket = bucket.get(leadingZeroIndex);
+
+        String closestNodeId = null;
+        BigInteger smallestDistance = xorDistance; // Start with own distance to data ID
+
+        // Check if the target bucket is empty or not
+        if (targetBucket != null && !targetBucket.isEmpty()) {
+            System.out.println("Accessing bucket index");
+            for (String otherNodeId : targetBucket) {
+                BigInteger distance = XOR.Distance(dataId, otherNodeId);
+                // Compare distances, and skip updating if the node is itself
+                if (distance.compareTo(smallestDistance) < 0) {
+                    smallestDistance = distance;
+                    closestNodeId = otherNodeId;
+                }
+            }
+        } else {
+            System.out.println("Bucket empty, accessing routing table");
+            // Fallback: Iterate through the entire routing table if the target bucket is empty
+            for (Map.Entry<String, RoutingPacket> entry : RoutingTable.getInstance().getMap().entrySet()) {
+
+                String otherNodeId = entry.getKey();
+                BigInteger distance = XOR.Distance(dataId, otherNodeId);
+                // Compare distances, and skip updating if the node is itself
+                if (distance.compareTo(smallestDistance) < 0) {
+                    smallestDistance = distance;
+                    closestNodeId = otherNodeId;
+                }
+            }
+        }
+
+        // If no closest node is found, or the closest node is the local node itself
+        if (closestNodeId == null || smallestDistance.equals(xorDistance)) {
+            System.out.println("Data ID is closest to the local node. Storing only locally.");
+            // Store the data locally
+            // Example: localDataStore.put(dataId, payload);
+        } else {
+            RoutingPacket routingPacket = RoutingTable.getInstance().getMap().get(closestNodeId);
+            System.out.println("Data ID is closest to node " + closestNodeId + ". Forwarding to node " + routingPacket.getHost() + ":" + routingPacket.getPort());
+            OutgoingConnectionHandler outgoingConnectionHandler = new OutgoingConnectionHandler();
+            outgoingConnectionHandler.connectToNode("store", routingPacket, dataId);
+        }
+    }
+
+
+}

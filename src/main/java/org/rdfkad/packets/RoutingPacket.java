@@ -3,9 +3,9 @@ package org.rdfkad.packets;
 
 import java.io.Serializable;
 public class RoutingPacket implements Serializable{
-    public static Integer port;
+    public Integer port;
     public  String host = "localhost";
-    public  static  Integer multicastId ;
+    public   Integer multicastId ;
     public RoutingPacket(Integer port){
         this.port = port;
             }
@@ -22,7 +22,7 @@ public class RoutingPacket implements Serializable{
 
     }
 
-    public static Integer getPort() {
+    public  Integer getPort() {
         return port;
     }
 

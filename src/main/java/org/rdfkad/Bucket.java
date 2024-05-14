@@ -1,52 +1,72 @@
+    package org.rdfkad;
 
-package org.rdfkad;
+    import org.rdfkad.functions.XOR;
+    import org.rdfkad.packets.RoutingPacket;
+    import org.rdfkad.tables.NodeConfig;
+    import org.rdfkad.tables.RoutingTable;
 
-import org.rdfkad.functions.XOR;
-import org.rdfkad.packets.RoutingPacket;
-import org.rdfkad.tables.RoutingTable;
+    import java.math.BigInteger;
+    import java.util.*;
+    import java.util.concurrent.ConcurrentHashMap;
 
-import java.math.BigInteger;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
+    public class Bucket {
 
+        // Singleton instance
+        private static Bucket instance;
 
-public class Bucket {
-    private final String nodeId;
-    private final ConcurrentHashMap<String, RoutingPacket> routingTable;
-    private final List<Set<String>> buckets;
-    RoutingTable routingTableInstance  = RoutingTable.getInstance();
+        // Private mutable list of buckets
+        private final List<Set<String>> buckets;
 
-    public Bucket(String nodeId, HashMap<String, RoutingPacket> routingTable, int bucketCount) {
-        this.nodeId = nodeId;
-        this.routingTable = routingTableInstance.getMap();
-        this.buckets = new ArrayList<>(bucketCount);
-        for (int i = 0; i < bucketCount; i++) {
-            this.buckets.add(new HashSet<>());
+        private  final  String ownNodeId ;
+        private final ConcurrentHashMap<String, RoutingPacket> routingTable;
+
+        private Bucket(int bucketCount) {
+            this.routingTable = RoutingTable.getInstance().getMap();
+            this.buckets = new ArrayList<>(bucketCount);
+            ownNodeId = NodeConfig.getInstance().getNodeId();
+            for (int i = 0; i < bucketCount; i++) {
+                this.buckets.add(new HashSet<>());
+            }
+        }
+
+        // Method to get the singleton instance
+        public static synchronized Bucket getInstance() {
+            if (instance == null) {
+                instance = new Bucket(13);
+            }
+            return instance;
+        }
+
+        // Public method to get read-only access to the buckets
+        public List<Set<String>> getBuckets() {
+            List<Set<String>> unmodifiableBuckets = new ArrayList<>();
+            for (Set<String> bucket : buckets) {
+                unmodifiableBuckets.add(Collections.unmodifiableSet(bucket));
+            }
+            return Collections.unmodifiableList(unmodifiableBuckets);
+        }
+
+        // Method to add a node to a specific bucket by index
+        public synchronized void addNodeToBucket(int index, String nodeId) {
+            if (index >= 0 && index < buckets.size()) {
+                buckets.get(index).add(nodeId);
+            } else {
+                throw new IndexOutOfBoundsException("Bucket index out of range: " + index);
+            }
+        }
+
+        // Method to sort nodes into buckets based on leading zeros
+        public void sortIntoBuckets() {
+            for (String otherNodeId : routingTable.keySet()) {
+                BigInteger distance = XOR.Distance(ownNodeId, otherNodeId);
+                int bucketIndex = getLeadingZeros(distance);
+                addNodeToBucket(bucketIndex, otherNodeId);
+            }
+        }
+
+        // Adjusted to a 12-bit identifier space
+        public static int getLeadingZeros(BigInteger distance) {
+            int highestSetBit = distance.bitLength() - 1;
+            return 11 - highestSetBit;
         }
     }
-
-    public void sortIntoBuckets() {
-        for (String otherNodeId : routingTable.keySet()) {
-            BigInteger distance = XOR.Distance(this.nodeId, otherNodeId);
-            int bucketIndex = getLeadingZeros(distance);
-            buckets.get(bucketIndex).add(otherNodeId);
-        }
-    }
-
-    // Adjusted to a 12-bit identifier space
-    public int getLeadingZeros(BigInteger distance) {
-        int highestSetBit = distance.bitLength() - 1;  // Calculates the highest set bit
-        return 11 - highestSetBit ;  // Adjust the calculation for a 12-bit space
-    }
-
-    public List<Integer> getBucketSizes() {
-        List<Integer> sizes = new ArrayList<>();
-        for (Set<String> bucket : buckets) {
-            sizes.add(bucket.size());
-        }
-        return sizes;
-    }
-    public List<Set<String>> getBuckets() {
-        return this.buckets;
-    }
-}

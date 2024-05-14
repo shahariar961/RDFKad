@@ -26,6 +26,13 @@
             <version>RELEASE</version>
             <scope>compile</scope>
         </dependency>
+        <!-- Add this to your pom.xml if using Maven -->
+        <dependency>
+            <groupId>org.jeasy</groupId>
+            <artifactId>easy-rules-core</artifactId>
+            <version>4.0.0</version>
+        </dependency>
+
     </dependencies>
 
 </project>

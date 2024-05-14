@@ -13,6 +13,10 @@ public class Payload implements Serializable {
 
 
 
+    private Object dataValue;
+
+
+
     private ConcurrentHashMap<String, RoutingPacket> routingTable;  // Routing table for 'connect' requests
     private String dataId;   // Specific data ID for 'find' requests
 
@@ -61,6 +65,13 @@ public class Payload implements Serializable {
         this.dataId = dataId;
         this.nodeId = nodeId;
         this.port = port;
+    }
+    public Payload(String request, String nodeId, int port ,  String dataId, Object dataValue) {
+        this.request = request;
+        this.dataId = dataId;
+        this.nodeId = nodeId;
+        this.port = port;
+        this.dataValue = dataValue;
     }
 
     // Constructor for 'found' request
@@ -124,5 +135,12 @@ public class Payload implements Serializable {
 
     public void setMulticastId(Integer multicastId) {
         this.multicastId = multicastId;
+    }
+    public Object getDataValue() {
+        return dataValue;
+    }
+
+    public void setDataValue(Object dataValue) {
+        this.dataValue = dataValue;
     }
 }

@@ -1,81 +1,79 @@
-package org.rdfkad.unittests;
-import org.junit.jupiter.api.Test;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
-import java.math.BigInteger;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Random;
-import java.util.Set;
-
-import org.rdfkad.functions.XOR;
-import org.rdfkad.packets.RoutingPacket;
-import org.rdfkad.Bucket;
-
-public class BucketTest {
-
-    private final HashMap<String, RoutingPacket> routingTable = new HashMap<>();
-
-    private void populateRoutingTable(int numberOfNodes) {
-        for (int i = 0; i < numberOfNodes; i++) {
-            String nodeId = generateRandomNodeId();
-            RoutingPacket packet = new RoutingPacket(5000); // Replace 5000 with the actual port number
-            routingTable.put(nodeId, packet);
-        }
-    }
-
-    private String generateRandomNodeId() {
-        Random random = new Random();
-        BigInteger bigInt = new BigInteger(12, random);
-        return bigInt.toString(2);
-    }
-
-//    @Test
-//    public void testGetLeadingZeros() {
-//        populateRoutingTable(100); // Populate the routing table with 10 nodes
-//        String nodeId = generateRandomNodeId();
-//        Bucket bucket = new Bucket(nodeId, routingTable, 160);
-//        int leadingZeros = bucket.getLeadingZeros(12);
-//        assertEquals(10, leadingZeros);
-//    }
-
-    //    @Test
-//    public void testSortIntoBuckets() {
-//        populateRoutingTable(300); // Populate the routing table with 10 nodes
-//        String nodeId = generateRandomNodeId();
-//        Bucket bucket = new Bucket(nodeId, routingTable, 12);
-//        bucket.sortIntoBuckets();
+//package org.rdfkad.unittests;
+//import org.junit.jupiter.api.BeforeEach;
+//import org.junit.jupiter.api.Test;
+//import org.rdfkad.Bucket;
+//import org.rdfkad.packets.RoutingPacket;
+//import org.rdfkad.tables.NodeConfig;
+//import org.rdfkad.tables.RoutingTable;
 //
-//        // Add assertions to check if the buckets are sorted as expected
-//        // This will depend on the entries you added to the routingTable
-//    }
-//    @Test
-//    public void testPrintBuckets() {
-//        populateRoutingTable(300); // Populate the routing table with 30 nodes
-//        String nodeId = generateRandomNodeId();
-//        Bucket bucket = new Bucket(nodeId, routingTable, 12);
-//        bucket.sortIntoBuckets();
+//import java.util.*;
+//import java.util.concurrent.ConcurrentHashMap;
 //
-//        // Print the buckets
-//        List<Set<String>> buckets = bucket.getBuckets();
-//        for (int i = 0; i < ((List<?>) buckets).size(); i++) {
-//            System.out.println("Bucket " + i + ": " + buckets.get(i));
+//import static org.junit.jupiter.api.Assertions.*;
+//
+//class BucketTest {
+//    private Bucket bucket;
+//    private final int bucketCount = 13; // For 12-bit space
+//
+//    @BeforeEach
+//    void setUp() {
+//        // Reset NodeConfig singleton for testing
+//        NodeConfig nodeConfig = NodeConfig.getInstance();
+//        nodeConfig.resetNodeId();
+//        nodeConfig.setNodeId("000101010001"); // Example 12-bit node ID
+//
+//        // Initialize the Bucket singleton with the required number of buckets
+//        bucket = Bucket.getInstance(bucketCount);
+//
+//        // Add nodes to the routing table for testing
+//        addTestNodesToRoutingTable();
+//    }
+//
+//    private void addTestNodesToRoutingTable() {
+//        ConcurrentHashMap<String, RoutingPacket> routingTable = RoutingTable.getInstance().getMap();
+//        Random random = new Random();
+//
+//        for (int i = 0; i < 3000; i++) {
+//            // Generate a random 12-bit node ID in binary format
+//            String nodeId = String.format("%12s", Integer.toBinaryString(random.nextInt(1 << 12))).replace(' ', '0');
+//            RoutingPacket packet = new RoutingPacket(8000 + i, "localhost", i);
+//            routingTable.put(nodeId, packet);
 //        }
 //    }
+//
+//    @Test
+//    void testSortIntoBuckets() {
+//        bucket.sortIntoBuckets();
+//
+//        List<Set<String>> buckets = bucket.getBuckets();
+//        assertEquals(13, buckets.size(), "Number of buckets should be 13");
+//
+//        // Print the number of nodes in each bucket
+//        for (int i = 0; i < buckets.size(); i++) {
+//            System.out.println("Bucket " + i + ": " + buckets.get(i).size() + " nodes");
+//        }
+//
+//        // Check nodes are added to the right buckets
+//        assertFalse(buckets.get(12).isEmpty(), "Expected nodes in bucket 12");
+//        assertFalse(buckets.get(10).isEmpty(), "Expected nodes in bucket 10");
+//    }
+//    @Test
+//    void testAddNodeToBucket() {
+//        // Add a node to a specific bucket index
+//        String testNodeId = "testNode";
+//        int bucketIndex = 5;
+//        bucket.addNodeToBucket(bucketIndex, testNodeId);
+//
+//        List<Set<String>> buckets = bucket.getBuckets();
+//        assertTrue(buckets.get(bucketIndex).contains(testNodeId), "Node should be in bucket " + bucketIndex);
+//    }
+//
+//    @Test
+//    void testInvalidBucketIndex() {
+//        String testNodeId = "testNode";
+//
+//        // Test out-of-range index
+//        assertThrows(IndexOutOfBoundsException.class, () -> bucket.addNodeToBucket(bucketCount, testNodeId));
+//        assertThrows(IndexOutOfBoundsException.class, () -> bucket.addNodeToBucket(-1, testNodeId));
+//    }
 //}
-    @Test
-    public void testPrintBuckets() {
-        populateRoutingTable(30000); // Populate the routing table with 300 nodes
-        String nodeId = generateRandomNodeId();  // This is the node ID used to initialize the bucket
-        Bucket bucket = new Bucket(nodeId, routingTable, 13);
-        bucket.sortIntoBuckets();
-
-        // Print the buckets and XOR distances next to each node ID
-        List<Integer> bucketSizes = bucket.getBucketSizes(); // This method now returns List<Integer> with sizes
-        for (int i = 0; i < bucketSizes.size(); i++) {
-            System.out.println("Bucket " + i + ": " + bucketSizes.get(i) + " nodes");
-        }
-    }
-}
