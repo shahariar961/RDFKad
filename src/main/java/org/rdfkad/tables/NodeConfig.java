@@ -8,6 +8,10 @@ public class NodeConfig {
     private Integer multicastId = 0;
     private  Integer nodePort = 0;
 
+    private boolean selfAlarmState = false;
+
+    private  int currentAlarmTier = 0;
+
     // Private constructor to prevent instantiation
     private NodeConfig() {}
 
@@ -32,6 +36,20 @@ public class NodeConfig {
     public synchronized String getNodeId() {
 
         return nodeId;
+    }
+
+    public void setSelfAlarmState(boolean selfAlarmState) {
+        this.selfAlarmState = selfAlarmState;
+    }
+    public boolean getSelfAlarmState() {
+        return selfAlarmState;
+    }
+    public int getCurrentAlarmTier() {
+        return currentAlarmTier;
+    }
+
+    public int setCurrentAlarmTier(int currentAlarmTier) {
+        return this.currentAlarmTier = currentAlarmTier;
     }
 
 

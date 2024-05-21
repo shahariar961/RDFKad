@@ -11,6 +11,8 @@ public class Payload implements Serializable {
     private Map<String, Object> data;  // Generic data container
     private Integer multicastId;  // Multicast ID for 'connect' requests
 
+    private String message;
+
 
 
     private Object dataValue;
@@ -72,6 +74,12 @@ public class Payload implements Serializable {
         this.nodeId = nodeId;
         this.port = port;
         this.dataValue = dataValue;
+    }
+
+    public Payload(int multicastId, String message, String request){
+        this.multicastId = multicastId;
+        this.message = message;
+        this.request = request;
     }
 
     // Constructor for 'found' request
@@ -142,5 +150,9 @@ public class Payload implements Serializable {
 
     public void setDataValue(Object dataValue) {
         this.dataValue = dataValue;
+    }
+
+    public String getMessage() {
+        return message;
     }
 }

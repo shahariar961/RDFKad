@@ -1,83 +1,92 @@
 package org.rdfkad.multicast;
 
-import org.jeasy.rules.api.Rules;
-import org.jeasy.rules.api.RulesEngine;
-import org.jeasy.rules.core.DefaultRulesEngine;
-import org.rdfkad.Node;
-import org.rdfkad.handlers.RDFDataHandler;
-import org.rdfkad.packets.RDFPacket;
 import org.rdfkad.packets.SensorDataPayload;
-import org.rdfkad.rules.TemperatureRule;
+import org.rdfkad.packets.RDFPacket;
 import org.rdfkad.tables.NodeConfig;
+import org.rdfkad.handlers.RDFDataHandler;
+import org.rdfkad.matrix.KademliaMatrix;
+import org.rdfkad.tables.AlarmMatrixObject;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.MulticastSocket;
+import java.net.Socket;
 import java.net.SocketException;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
-public class SensorMulticastReceiver  implements  Runnable{
-
+public class SensorMulticastReceiver implements Runnable {
     private static final String MULTICAST_GROUP = "230.0.0.1";
-    private static final int PORT = 4446;
-// The unique ID this client responds to
-    Pattern pattern = Pattern.compile("\\d+"); // Regex for one or more digits
+    private static final int MULTICAST_PORT = 4446;
+    private static final String BOOTSTRAP_SERVER_HOST = "localhost";
+    private static final int BOOTSTRAP_SERVER_PORT = 9090;
 
+    private RDFDataHandler rdfDataHandler = new RDFDataHandler();
+    private NodeConfig nodeConfig = NodeConfig.getInstance();
+    private KademliaMatrix kademliaMatrix = KademliaMatrix.getInstance();
+    private boolean selfAlarmState;
+    private int currentAlarmTier ;
+    private MulticastSocket multicastSocket;
+    private final ExecutorService senderPool = Executors.newSingleThreadExecutor();
 
-    public  void run() {
-        try (MulticastSocket socket = new MulticastSocket(PORT)) {
+    @Override
+    public void run() {
+        try {
+            multicastSocket = new MulticastSocket(MULTICAST_PORT);
             InetAddress group = InetAddress.getByName(MULTICAST_GROUP);
-            socket.joinGroup(group);
-//            Rules rules = new Rules();
-//            RulesEngine rulesEngine = new DefaultRulesEngine();
-//            TemperatureRule temperatureRule = new TemperatureRule();
-//            rules.register(temperatureRule);
+            multicastSocket.joinGroup(group);
 
-//            org.jeasy.rules.api.Facts facts = new org.jeasy.rules.api.Facts();
             while (true) {
                 byte[] buf = new byte[1024];
                 DatagramPacket packet = new DatagramPacket(buf, buf.length);
-                socket.receive(packet);
+                multicastSocket.receive(packet);
 
                 // Deserialize the incoming data
-                ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(packet.getData());
+                ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(packet.getData(), 0, packet.getLength());
                 try (ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream)) {
                     Object object = objectInputStream.readObject();
                     if (object instanceof SensorDataPayload) {
                         SensorDataPayload payload = (SensorDataPayload) object;
                         int uniqueId = payload.getUniqueId();
-                        int multicastId = NodeConfig.getInstance().getMulticastId();
-                        // Check if the unique ID matches
-                        if (multicastId == uniqueId) {
-                            System.out.println("Received relevant payload:");
-                            System.out.println("Unique ID: " + payload.getUniqueId());
-                            RDFPacket rdfData = payload.getRdfData();
+                        int ownMulticastId = nodeConfig.getMulticastId();
+                        String request = payload.getRequest();
 
-                            int temperature = Integer.parseInt(rdfData.getObject());
 
-//                            facts.put("temperature", temperature);
-                            System.out.println("Temperature: " + temperature);
+                        if ("sensor info".equals(request)) {
+                            if (ownMulticastId == uniqueId) {
+                                System.out.println("Received relevant payload:");
+                                System.out.println("Unique ID: " + payload.getUniqueId());
+                                RDFPacket rdfData = payload.getRdfData();
 
-//                            rulesEngine.fire(rules, facts);
-                            if (temperature > 30) {
-                                System.out.println("Temperature is above 30 degrees");
-                            } else {
-                                System.out.println("Temperature is below 30 degrees");
+                                int temperature = Integer.parseInt(rdfData.getObject());
+                                String dataAddress = rdfDataHandler.storeRDF(rdfData);
+                                System.out.println(dataAddress);
+
+                                System.out.println("Temperature: " + temperature);
+                                if (temperature > 45) {
+                                    System.out.println("Above Threshold handling alarm");
+                                    senderPool.submit(() -> handleTemperatureAlarm(ownMulticastId, dataAddress, temperature));
+                                } else {
+                                    handleTemperatureBelowThreshold(ownMulticastId, dataAddress);
+                                }
                             }
-                            System.out.println("RDF Data: Subject - " + rdfData.getSubject() +
-                                    ", Predicate - " + rdfData.getPredicate() +
-                                    ", Object - " + rdfData.getObject());
-                            System.out.println("Sending data for storage");
-                            RDFDataHandler rdfDataHandler = new RDFDataHandler();
-                            rdfDataHandler.storeRDF(rdfData);
-                        }
+                        } else if ("alarm p1".equals(request) &&  uniqueId != ownMulticastId) {
+                            String payloadDataAddress = payload.getDataAddress();
+                                kademliaMatrix.activateAlarmById(uniqueId, payloadDataAddress);
+                                System.out.println("Alarm Status p1 Temp Alarm on Node: " + uniqueId);
 
-                        }
 
+
+                        }else if ("alarm off".equals(request)) {
+                            kademliaMatrix.deactivateAlarmById(uniqueId);
+                        }
+                    }
                 } catch (ClassNotFoundException e) {
                     System.out.println("Error during deserialization: " + e.getMessage());
                 }
@@ -86,7 +95,89 @@ public class SensorMulticastReceiver  implements  Runnable{
             System.out.println("Socket Exception: " + e.getMessage());
         } catch (IOException e) {
             System.out.println("IO Exception: " + e.getMessage());
+        } finally {
+            if (multicastSocket != null && !multicastSocket.isClosed()) {
+                try {
+                    InetAddress group = InetAddress.getByName(MULTICAST_GROUP);
+                    multicastSocket.leaveGroup(group);
+                    multicastSocket.close();
+                } catch (IOException e) {
+                    System.out.println("Error leaving multicast group: " + e.getMessage());
+                }
+            }
+            senderPool.shutdown();
+        }
+    }
+
+    private void handleTemperatureAlarm(int ownMulticastId, String dataAddress, int temperature) {
+        List<AlarmMatrixObject> alarmingNeighbors = kademliaMatrix.checkNeighborsAndTakeAction();
+        selfAlarmState = nodeConfig.getSelfAlarmState();
+        currentAlarmTier = nodeConfig.getCurrentAlarmTier();
+        System.out.println(alarmingNeighbors);
+        if (!selfAlarmState) {
+            if (alarmingNeighbors.isEmpty()) {
+                System.out.println("No Neighbours Alarming, Setting Alarm Status to P1");
+                kademliaMatrix.activateAlarmById(ownMulticastId, dataAddress);
+                nodeConfig.setCurrentAlarmTier(1);
+                nodeConfig.setSelfAlarmState(true);
+                sendUnicastMessage(ownMulticastId, dataAddress, "alarm p1");
+            } else if (alarmingNeighbors.size() == 1) {
+                System.out.println("One Neighbour is Alarming, Setting Alarm Status to P2");
+                kademliaMatrix.activateAlarmById(ownMulticastId, dataAddress);
+                nodeConfig.setSelfAlarmState(true);
+                nodeConfig.setCurrentAlarmTier(2);
+                AlarmMatrixObject firstItem = alarmingNeighbors.get(0);
+                String dataAddressOne = firstItem.getDataAddress();
+                int otherMulticastId = firstItem.getMulticastId();
+                String compoundDataAddress = dataAddress + "," + dataAddressOne;
+
+                sendUnicastMessage(ownMulticastId, compoundDataAddress, "alarm p2");
+                System.out.println("Alarm Status p2 Temp Alarm on neighbour: " + otherMulticastId);
+            } else if (alarmingNeighbors.size() == 2) {
+                System.out.println("Checking neighbour if two");
+                kademliaMatrix.activateAlarmById(ownMulticastId, dataAddress);
+                nodeConfig.setSelfAlarmState(true);
+                nodeConfig.setCurrentAlarmTier(3);
+                AlarmMatrixObject firstItem = alarmingNeighbors.get(0);
+                AlarmMatrixObject secondItem = alarmingNeighbors.get(1);
+                String dataAddressOne = firstItem.getDataAddress();
+                String dataAddressTwo = secondItem.getDataAddress();
+
+                int multicastIdOne = firstItem.getMulticastId();
+                int multicastIdTwo = secondItem.getMulticastId();
+                String compoundDataAddress = dataAddress + "," + dataAddressOne + "," + dataAddressTwo;
+
+                sendUnicastMessage(ownMulticastId, compoundDataAddress, "alarm p3");
+                System.out.println("Alarm Status p3 Temp Alarm on neighbours: " + multicastIdOne + " and " + multicastIdTwo);
+            }
+        } else {
+            System.out.println("Alarm already activated");
         }
 
+    }
+
+    private void handleTemperatureBelowThreshold(int ownMulticastId, String dataAddress) {
+        System.out.println("Temperature is below 45 degrees");
+        selfAlarmState = nodeConfig.getSelfAlarmState();
+        if (selfAlarmState) {
+            System.out.println("Alarm Deactivated");
+            kademliaMatrix.deactivateAlarmById(ownMulticastId);
+            nodeConfig.setSelfAlarmState(false);
+            sendUnicastMessage(ownMulticastId, dataAddress, "alarm off");
+        }
+    }
+
+    private void sendUnicastMessage(int multicastId, String dataAddress, String request) {
+        SensorDataPayload payload = new SensorDataPayload(multicastId, dataAddress, request);
+
+        // Serialize the SensorDataPayload object
+        try (Socket socket = new Socket(BOOTSTRAP_SERVER_HOST, BOOTSTRAP_SERVER_PORT);
+             ObjectOutputStream outputStream = new ObjectOutputStream(socket.getOutputStream())) {
+
+            outputStream.writeObject(payload);
+            System.out.println("Sent unicast message to bootstrap server");
+        } catch (IOException e) {
+            System.out.println("Error sending unicast message: " + e.getMessage());
+        }
     }
 }

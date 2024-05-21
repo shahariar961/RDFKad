@@ -49,7 +49,7 @@ public class DataHandler {
                 }
             }
         } else {
-            System.out.println("Bucket empty, accessing routing table");
+            //System.out.println("Bucket empty, accessing routing table");
             // Fallback: Iterate through the entire routing table if the target bucket is empty
             for (Map.Entry<String, RoutingPacket> entry : RoutingTable.getInstance().getMap().entrySet()) {
 

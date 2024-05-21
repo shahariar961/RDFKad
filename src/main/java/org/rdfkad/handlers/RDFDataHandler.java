@@ -19,7 +19,8 @@ public class RDFDataHandler {
     public RDFDataHandler() {
         this.dataTable = DataTable.getInstance().getMap();
     }
-    public void storeRDF(RDFPacket rdf) {
+    public String storeRDF(RDFPacket rdf) {
+        String packetHash = null;
         try {
             // Step 1: Store RDF packet in local file
 
@@ -37,16 +38,17 @@ public class RDFDataHandler {
             dataHandler.sendData(objectHash, rdf.object);
 
             // Step 3: Hash the entire packet and store composite hash
-            String packetHash = get12BitHash(rdf.toString());
+            packetHash = get12BitHash(rdf.toString());
             String compositeValue = String.join(",", subjectHash, predicateHash, objectHash);
             dataTable.put(packetHash, compositeValue);
             dataHandler.sendData(packetHash, compositeValue);
 
-        } catch ( NoSuchAlgorithmException e) {
+        } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+        return packetHash;
     }
 
     public String get12BitHash(String input) throws NoSuchAlgorithmException {

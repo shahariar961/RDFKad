@@ -9,62 +9,67 @@ import org.rdfkad.tables.DataTable;
 import org.rdfkad.tables.NodeConfig;
 import org.rdfkad.tables.RoutingTable;
 
-import java.util.concurrent.ConcurrentHashMap;
-
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.*;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class Node {
-    private BlockingQueue<List<String>> dataQueue;
     private ServerSocket serverSocket;
     private static ConcurrentHashMap<String, RoutingPacket> routingTable = RoutingTable.getInstance().getMap();
-    private ConcurrentHashMap<String, Object> dataTable = DataTable.getInstance().getMap();
-    private static String nodeId = NodeConfig.getInstance().getNodeId();
-
-    private static Integer multicastId= NodeConfig.getInstance().getMulticastId();
-
+    private static ConcurrentHashMap<String, Object> dataTable = DataTable.getInstance().getMap();
     private static NodeConfig nodeConfig = NodeConfig.getInstance();
-
     private static Integer nodePort = NodeConfig.getInstance().getNodePort();
-    private final List<Set<String>> bucket;
+    private final ExecutorService connectionPool;
+    private final ExecutorService multicastReceiverPool;
 
+    public Node() {
+        this.connectionPool = Executors.newCachedThreadPool();
+        this.multicastReceiverPool = Executors.newCachedThreadPool();
+    }
 
     public void startServer(int port) {
         try {
             serverSocket = new ServerSocket(port);
             System.out.println("Node listening on port " + port);
 
-            ExecutorService executorService = Executors.newCachedThreadPool();
-            executorService.submit(this::listenForConnections);
-            executorService.submit(new SensorMulticastReceiver());
+            // Start listening for incoming connections
+            connectionPool.submit(this::listenForConnections);
+
+            // Start the multicast receiver in a separate thread
+            //multicastReceiverPool.submit(new SensorMulticastReceiver());
+            multicastReceiverPool.submit(this::listenForMulticast);
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
-
+    public void listenForMulticast() {
+        SensorMulticastReceiver multicastReceiver = new SensorMulticastReceiver();
+        multicastReceiver.run(); // Start the receiver in the current thread
+    }
     public void listenForConnections() {
         while (true) {
             try {
                 Socket clientSocket = serverSocket.accept();
                 System.out.println("Accepted connection from Node on port " + clientSocket.getPort());
                 IncomingConnectionHandler connectionHandler = new IncomingConnectionHandler(clientSocket);
-                connectionHandler.handleConnection();
+                connectionPool.submit(connectionHandler::handleConnection);
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
     }
 
-    public void connectToBootstrapServer(String request,String host, int port) {
+    public void connectToBootstrapServer(String request, String host, int port) {
         OutgoingConnectionHandler handler = new OutgoingConnectionHandler();
-        handler.connectToBootstrapServer(request,host, port);
+        handler.connectToBootstrapServer(request, host, port);
     }
+
     public static void main(String[] args) {
         Node node = new Node();
         if (args.length != 1) {
@@ -72,34 +77,30 @@ public class Node {
             System.exit(1);
         }
 
-        int port  = Integer.parseInt(args[0]);
+        int port = Integer.parseInt(args[0]);
         nodeConfig.setNodePort(port);
-        System.out.println("Listening on port "+ port);
+        System.out.println("Listening on port " + port);
         node.startServer(port);
-        node.connectToBootstrapServer("register","localhost", 9090);
-
-
+        node.connectToBootstrapServer("register", "localhost", 9090);
 
         BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
         while (true) {
             try {
-
                 System.out.print("Enter command (search data <data Id> or connect server <port> or store data <Id> <Value>): ");
                 String command = reader.readLine().trim();
 
                 if (command.startsWith("refresh routing")) {
-                node.connectToBootstrapServer("refresh routing" , "localhost",  9090);
+                    node.connectToBootstrapServer("refresh routing", "localhost", 9090);
                 } else if (command.startsWith("show routing")) {
-                    if (routingTable.isEmpty()){
+                    if (routingTable.isEmpty()) {
                         System.out.println("Routing table is empty");
-                    }else {
-                        for (Map.Entry<String,RoutingPacket> entry : routingTable.entrySet()){
+                    } else {
+                        for (Map.Entry<String, RoutingPacket> entry : routingTable.entrySet()) {
                             System.out.println(entry.getKey());
                             System.out.println(entry.getValue().getPort());
                         }
                     }
-                }
-                else if (command.startsWith("find data")) {
+                } else if (command.startsWith("find data")) {
                     String[] tokens = command.split(" ");
                     if (tokens.length != 3) {
                         System.out.println("Invalid command format. Expected: find data <dataId>");
@@ -108,20 +109,22 @@ public class Node {
                     String dataId = tokens[2];
                     DataFinder dataFinder = new DataFinder();
                     dataFinder.findData(dataId);
-                }else {
-                    System.out.println("Unknown command. Available commands: connect node <host> <port> or connect server <host> <port>");
+                } else if (command.startsWith("store data")) {
+                    String[] tokens = command.split(" ");
+                    if (tokens.length != 4) {
+                        System.out.println("Invalid command format. Expected: store data <dataId> <dataValue>");
+                        continue;
+                    }
+                    String dataId = tokens[2];
+                    String dataValue = tokens[3];
+                    dataTable.put(dataId, dataValue);
+                    System.out.println("Data id " + dataId + " stored successfully");
+                } else {
+                    System.out.println("Unknown command. Available commands: refresh routing, show routing, find data, store data");
                 }
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
-    }
-
-
-
-
-    public Node() {
-        this.dataQueue = new ArrayBlockingQueue<>(10);
-        this.bucket = new ArrayList<>();
     }
 }
