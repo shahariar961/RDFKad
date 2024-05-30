@@ -41,6 +41,14 @@ public class Payload implements Serializable {
         this.nodeId = nodeId;
         this.port = port;
     }
+    public Payload(String request,ConcurrentHashMap<String, RoutingPacket> routingTable ){
+        this.request = request;
+        this.routingTable = routingTable;
+    }
+    public Payload(String nodeId, String dataId) {
+        this.dataId = dataId;
+        this.nodeId = nodeId;
+    }
     public Payload(String request, String nodeId,  ConcurrentHashMap<String, RoutingPacket> routingTable) {
         this.request = request;
         this.nodeId = nodeId;

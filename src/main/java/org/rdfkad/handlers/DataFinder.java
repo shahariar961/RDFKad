@@ -1,9 +1,7 @@
 package org.rdfkad.handlers;
-//
 
-import org.rdfkad.Bucket;
 import org.rdfkad.functions.XOR;
-import org.rdfkad.Node;
+import org.rdfkad.packets.RDFPacket;
 import org.rdfkad.packets.RoutingPacket;
 import org.rdfkad.tables.DataTable;
 import org.rdfkad.tables.NodeConfig;
@@ -11,80 +9,118 @@ import org.rdfkad.tables.RoutingTable;
 
 import java.io.IOException;
 import java.math.BigInteger;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class DataFinder {
-    private final List<Set<String>> buckets  = Bucket.getInstance().getBuckets();
-    private String ownNodeId;
+    private  DataTable dataTableMap = DataTable.getInstance();
+    private ConcurrentHashMap<String, Object> dataTable;
+    private  OutgoingConnectionHandler outgoingConnectionHandler = new OutgoingConnectionHandler();
+    private RoutingTable routingTableMap = RoutingTable.getInstance();
+    private ConcurrentHashMap<String, RoutingPacket> routingTable;
+    private String ownNodeId= NodeConfig.getInstance().getNodeId();
 
-    private NodeConfig nodeConfig = NodeConfig.getInstance();
 
-    private ConcurrentHashMap <String, Object> dataTable = DataTable.getInstance().getMap();
+    public DataFinder() {
 
-    public DataFinder(){
+    }
+    public String findData(String dataId) throws IOException {
+        dataTable = dataTableMap.getMap();
+        routingTable = routingTableMap.getMap();
+        String dataValue;
 
-        this.ownNodeId = nodeConfig.getNodeId();
+        // Step 1: Retrieve the composite data value
+
+        if (dataTable.containsKey(dataId)) {
+            dataValue=  dataTable.get(dataId).toString();
+        } else {
+            String closestNodeId = FindClosestNode(dataId);
+            RoutingPacket routingPacket = routingTable.get(closestNodeId);
+            try {
+                outgoingConnectionHandler.connectToNode("find", routingPacket, dataId);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            dataTable = dataTableMap.getMap();
+            dataValue = dataTable.get(dataId).toString();
+
+        }
+        System.out.println("Data value: " + dataValue);
+        return dataValue;
+
+    }
+    public String findCompositeData(String compositeDataId) throws IOException {
+        dataTable = dataTableMap.getMap();
+        routingTable = routingTableMap.getMap();
+        String compositeValue;
+        String objectValue ;
+
+        // Step 1: Retrieve the composite data value
+
+        if (dataTable.containsKey(compositeDataId)) {
+            compositeValue = dataTable.get(compositeDataId).toString();
+            System.out.println("Composite data value: " + compositeValue);
+            String[] dataIds = compositeValue.split(",");
+            if (dataIds.length != 3) {
+                throw new IllegalArgumentException("Composite data value does not contain exactly three data IDs: " + compositeValue);
+            }
+            // Step 3: Retrieve the values corresponding to these three data IDs
+            String subjectId = dataIds[0];
+            String predicateId = dataIds[1];
+            String objectId = dataIds[2];
+            try {
+                dataTable.put(subjectId, findData(subjectId));
+                dataTable.put(predicateId, findData(predicateId));
+                dataTable.put(objectId, findData(objectId));
+            }catch (IOException e){
+                e.printStackTrace();
+            }
+
+        }else {
+            String closestNodeId = FindClosestNode(compositeDataId);
+            RoutingPacket routingPacket = routingTable.get(closestNodeId);
+            outgoingConnectionHandler.connectToNode("find", routingPacket, compositeDataId);
+            dataTable = dataTableMap.getMap();
+            compositeValue = dataTable.get(compositeDataId).toString();
+        }
+        // Step 2: Split the composite data value to get three individual data IDs
+        String[] dataIds = compositeValue.split(",");
+        if (dataIds.length != 3) {
+            throw new IllegalArgumentException("Composite data value does not contain exactly three data IDs: " + compositeValue);
+        }
+        // Step 3: Retrieve the values corresponding to these three data IDs
+        String subjectId = dataIds[0];
+        String predicateId = dataIds[1];
+        String objectId = dataIds[2];
+        try {
+            dataTable.put(subjectId, findData(subjectId));
+            dataTable.put(predicateId, findData(predicateId));
+            dataTable.put(objectId, findData(objectId));
+
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        objectValue = dataTable.get(objectId).toString();
+        System.out.println("Object value: " + objectValue);
+        return objectValue;
 
     }
 
-
-    /**
-     * Retrieves the set of node IDs from the bucket that corresponds to the given data ID.
-     *
-     * @param dataId The 12-bit binary data ID to search for.
-     * @return A set of node IDs from the corresponding bucket.
-     */
-
-
-    public void findData(String dataId) throws IOException {
-        BigInteger xorDistance = XOR.Distance(dataId, ownNodeId);
-        int leadingZeroIndex = Bucket.getLeadingZeros(xorDistance);
-        Set<String> targetBucket = buckets.get(leadingZeroIndex);
-        String closestNodeId = null;
-        BigInteger smallestDistance = xorDistance;
-        if (targetBucket != null && !targetBucket.isEmpty()) {
-            System.out.println("Accessing bucket index");
-            for (String otherNodeId : targetBucket) {
-                BigInteger distance = XOR.Distance(dataId, otherNodeId);
-                // Compare distances, and skip updating if the node is itself
-                if (distance.compareTo(smallestDistance) < 0) {
-                    smallestDistance = distance;
-                    closestNodeId = otherNodeId;
-                }
-            }
-        } else {
-            System.out.println("Bucket empty, accessing routing table");
-            // Fallback: Iterate through the entire routing table if the target bucket is empty
-            for (Map.Entry<String, RoutingPacket> entry : RoutingTable.getInstance().getMap().entrySet()) {
+        private String FindClosestNode (String compositeDataId){
+            BigInteger xorDistance = XOR.Distance(compositeDataId, ownNodeId);
+            String closestNodeId = null;
+            BigInteger smallestDistance = xorDistance;
+            for (Map.Entry<String, RoutingPacket> entry : routingTable.entrySet()) {
 
                 String otherNodeId = entry.getKey();
-                BigInteger distance = XOR.Distance(dataId, otherNodeId);
+                BigInteger distance = XOR.Distance(compositeDataId, otherNodeId);
                 // Compare distances, and skip updating if the node is itself
                 if (distance.compareTo(smallestDistance) < 0) {
                     smallestDistance = distance;
                     closestNodeId = otherNodeId;
                 }
             }
-        }
-        if (closestNodeId == null || smallestDistance.equals(xorDistance)) {
-            System.out.println("Node is closest to Data id, finding node locally.");
-            if (dataTable.containsKey(dataId)) {
-                System.out.println("Data Found Locally");
-                System.out.println(dataTable.get(dataId));
-            } else {
-                System.out.println("Data Not Found Locally");
-            }
-
-            // Store the data locally
-            // Example: localDataStore.put(dataId, payload);
-        } else {
-            RoutingPacket routingPacket = RoutingTable.getInstance().getMap().get(closestNodeId);
-            System.out.println("Querying Node" + closestNodeId + "For Data " + routingPacket.getHost() + ":" + routingPacket.getPort());
-            OutgoingConnectionHandler outgoingConnectionHandler = new OutgoingConnectionHandler();
-            outgoingConnectionHandler.connectToNode("find", routingPacket, dataId);
+            return closestNodeId;
         }
     }
-}

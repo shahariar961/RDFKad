@@ -1,5 +1,6 @@
 package org.rdfkad.multicast;
 
+import org.rdfkad.handlers.ConsensusHandler;
 import org.rdfkad.packets.SensorDataPayload;
 import org.rdfkad.packets.RDFPacket;
 import org.rdfkad.tables.NodeConfig;
@@ -30,6 +31,8 @@ public class SensorMulticastReceiver implements Runnable {
     private RDFDataHandler rdfDataHandler = new RDFDataHandler();
     private NodeConfig nodeConfig = NodeConfig.getInstance();
     private KademliaMatrix kademliaMatrix = KademliaMatrix.getInstance();
+
+    private ConsensusHandler consensusHandler = new ConsensusHandler();
     private boolean selfAlarmState;
     private int currentAlarmTier ;
     private MulticastSocket multicastSocket;
@@ -76,7 +79,7 @@ public class SensorMulticastReceiver implements Runnable {
                                     handleTemperatureBelowThreshold(ownMulticastId, dataAddress);
                                 }
                             }
-                        } else if ("alarm p1".equals(request) &&  uniqueId != ownMulticastId) {
+                        } else if (("alarm p1".equals(request) || "alarm p2".equals(request) || "alarm p3".equals(request))  &&  uniqueId != ownMulticastId) {
                             String payloadDataAddress = payload.getDataAddress();
                                 kademliaMatrix.activateAlarmById(uniqueId, payloadDataAddress);
                                 System.out.println("Alarm Status p1 Temp Alarm on Node: " + uniqueId);
@@ -116,39 +119,37 @@ public class SensorMulticastReceiver implements Runnable {
         System.out.println(alarmingNeighbors);
         if (!selfAlarmState) {
             if (alarmingNeighbors.isEmpty()) {
+                AlarmMatrixObject ownAlarm = new AlarmMatrixObject(true, ownMulticastId, dataAddress);
+                alarmingNeighbors.add(ownAlarm);
                 System.out.println("No Neighbours Alarming, Setting Alarm Status to P1");
                 kademliaMatrix.activateAlarmById(ownMulticastId, dataAddress);
                 nodeConfig.setCurrentAlarmTier(1);
                 nodeConfig.setSelfAlarmState(true);
-                sendUnicastMessage(ownMulticastId, dataAddress, "alarm p1");
+                if (consensusHandler.runConsensusAlgorithm(alarmingNeighbors)) {
+                    nodeConfig.setCurrentAlarmTier(2);
+                    sendUnicastMessage(ownMulticastId, dataAddress, "alarm p1");
+                }
             } else if (alarmingNeighbors.size() == 1) {
-                System.out.println("One Neighbour is Alarming, Setting Alarm Status to P2");
+                AlarmMatrixObject ownAlarm = new AlarmMatrixObject(true, ownMulticastId, dataAddress);
+                System.out.println("One Neighbour is Alarming, Starting P1 Alarm, Seeking Consensus to Upgrade Alarm");
                 kademliaMatrix.activateAlarmById(ownMulticastId, dataAddress);
-                nodeConfig.setSelfAlarmState(true);
-                nodeConfig.setCurrentAlarmTier(2);
-                AlarmMatrixObject firstItem = alarmingNeighbors.get(0);
-                String dataAddressOne = firstItem.getDataAddress();
-                int otherMulticastId = firstItem.getMulticastId();
-                String compoundDataAddress = dataAddress + "," + dataAddressOne;
+                alarmingNeighbors.add(ownAlarm);
 
-                sendUnicastMessage(ownMulticastId, compoundDataAddress, "alarm p2");
-                System.out.println("Alarm Status p2 Temp Alarm on neighbour: " + otherMulticastId);
+                if (consensusHandler.runConsensusAlgorithm(alarmingNeighbors)) {
+                    nodeConfig.setCurrentAlarmTier(2);
+                    sendUnicastMessage(ownMulticastId, dataAddress, "alarm p2");
+                    nodeConfig.setSelfAlarmState(true);
+                }
             } else if (alarmingNeighbors.size() == 2) {
-                System.out.println("Checking neighbour if two");
+                AlarmMatrixObject ownAlarm = new AlarmMatrixObject(true, ownMulticastId, dataAddress);
+                System.out.println("One Neighbour is Alarming, Starting P1 Alarm, Seeking Consensus to Upgrade Alarm");
                 kademliaMatrix.activateAlarmById(ownMulticastId, dataAddress);
+                alarmingNeighbors.add(ownAlarm);
                 nodeConfig.setSelfAlarmState(true);
-                nodeConfig.setCurrentAlarmTier(3);
-                AlarmMatrixObject firstItem = alarmingNeighbors.get(0);
-                AlarmMatrixObject secondItem = alarmingNeighbors.get(1);
-                String dataAddressOne = firstItem.getDataAddress();
-                String dataAddressTwo = secondItem.getDataAddress();
-
-                int multicastIdOne = firstItem.getMulticastId();
-                int multicastIdTwo = secondItem.getMulticastId();
-                String compoundDataAddress = dataAddress + "," + dataAddressOne + "," + dataAddressTwo;
-
-                sendUnicastMessage(ownMulticastId, compoundDataAddress, "alarm p3");
-                System.out.println("Alarm Status p3 Temp Alarm on neighbours: " + multicastIdOne + " and " + multicastIdTwo);
+                if (consensusHandler.runConsensusAlgorithm(alarmingNeighbors)) {
+                    nodeConfig.setCurrentAlarmTier(3);
+                    sendUnicastMessage(ownMulticastId, dataAddress, "alarm p3");
+                }
             }
         } else {
             System.out.println("Alarm already activated");

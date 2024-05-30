@@ -1,6 +1,7 @@
 package org.rdfkad;
 
 import org.rdfkad.handlers.IncomingConnectionHandler;
+import org.rdfkad.handlers.OutgoingConnectionHandler;
 import org.rdfkad.multicast.MulticastMessagePrinter;
 import org.rdfkad.multicast.SensorMulticastSender;
 import org.rdfkad.multicast.SensorMulticastServer;
@@ -97,6 +98,20 @@ public class BootstrapServer {
                             System.out.println(entry.getValue().getPort());
                         }
                     }
+                }
+                else if (command.startsWith("update routing")){
+                    OutgoingConnectionHandler handler = new OutgoingConnectionHandler();
+                    for (Map.Entry<String, RoutingPacket> entry : routingTable.entrySet()) {
+                        String nodeId = entry.getKey();
+                        RoutingPacket routingPacket = entry.getValue();
+                        String host = routingPacket.getHost();
+                        int port = routingPacket.getPort();
+
+                        System.out.println("Connecting to Node ID: " + nodeId);
+
+                        handler.connectToBootstrapServer("update routing", host, port);
+                    }
+
                 } else if (command.startsWith("time")) {
                     List<Long> latencies = MulticastMessagePrinter.getLatencies();
                     if (latencies.isEmpty()) {

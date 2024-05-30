@@ -98,6 +98,7 @@ public class Node {
                         for (Map.Entry<String, RoutingPacket> entry : routingTable.entrySet()) {
                             System.out.println(entry.getKey());
                             System.out.println(entry.getValue().getPort());
+                            System.out.println(entry.getValue().getMulticastId());
                         }
                     }
                 } else if (command.startsWith("find data")) {
@@ -108,7 +109,7 @@ public class Node {
                     }
                     String dataId = tokens[2];
                     DataFinder dataFinder = new DataFinder();
-                    dataFinder.findData(dataId);
+                     dataFinder.findCompositeData(dataId);
                 } else if (command.startsWith("store data")) {
                     String[] tokens = command.split(" ");
                     if (tokens.length != 4) {

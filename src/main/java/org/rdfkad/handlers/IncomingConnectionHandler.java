@@ -7,6 +7,7 @@ import org.rdfkad.packets.SensorDataPayload;
 import org.rdfkad.packets.RoutingPacket;
 import org.rdfkad.tables.DataTable;
 import org.rdfkad.tables.RoutingTable;
+import org.rdfkad.tables.NodeConfig;
 
 import java.io.*;
 import java.net.DatagramPacket;
@@ -21,11 +22,17 @@ public class IncomingConnectionHandler implements Runnable {
     private static final String MULTICAST_GROUP = "230.0.0.1";
     private static final int MULTICAST_PORT = 4446;
 
+    private DataFinder dataFinder = new DataFinder();
+    private String ownNodeId;
+    private NodeConfig nodeConfig = NodeConfig.getInstance();
+
     private Socket socket;
+    private final int Threshold = 45;
     private ConcurrentHashMap<String, RoutingPacket> routingTable = RoutingTable.getInstance().getMap();
     private ConcurrentHashMap<String, Object> dataTable = DataTable.getInstance().getMap();
 
     public IncomingConnectionHandler(Socket socket) {
+        this.ownNodeId = nodeConfig.getNodeId();
         this.socket = socket;
     }
 
@@ -60,6 +67,13 @@ public class IncomingConnectionHandler implements Runnable {
                     case "refresh routing":
                         handleRefreshRoutingRequest(receivedPayload, outputStream);
                         break;
+                    case "consensus":
+                        handleConsensusRequest(receivedPayload, outputStream);
+
+                        break;
+                    case "update routing":
+                        updateRoutingTable(receivedPayload);
+                    break;
                     default:
                         System.out.println("Unknown request: " + receivedPayload.getRequest());
                 }
@@ -102,7 +116,7 @@ public class IncomingConnectionHandler implements Runnable {
         int multicastId = routingTable.size() + 1;
         String generatedNodeId = IDGenerator.generateNodeId();
         Payload messagePayload = new Payload("registered", generatedNodeId, routingTable, multicastId);
-        routingTable.put(generatedNodeId, new RoutingPacket(receivedPayload.getPort()));
+        routingTable.put(generatedNodeId, new RoutingPacket(receivedPayload.getPort(), multicastId));
         outputStream.writeObject(messagePayload);
         System.out.println("Node registered with ID: " + generatedNodeId + " Multicast id: " + multicastId);
     }
@@ -112,6 +126,21 @@ public class IncomingConnectionHandler implements Runnable {
         outputStream.writeObject(messagePayload);
         System.out.println("Sent routing data to Node: " + receivedPayload.getNodeId());
     }
+    private void handleConsensusRequest(Payload receivedPayload, ObjectOutputStream outputStream) throws IOException {
+
+        int objectValue = Integer.parseInt(dataFinder.findCompositeData(receivedPayload.getDataId()));
+        if (objectValue > Threshold) {
+            Payload messagePayload = new Payload("ok consensus", receivedPayload.getNodeId(), receivedPayload.getPort(), receivedPayload.getDataId());
+            outputStream.writeObject(messagePayload);
+            System.out.println("Consensus lookup successful");
+        } else {
+            Payload messagePayload = new Payload("no consensus", receivedPayload.getNodeId(), receivedPayload.getPort(), receivedPayload.getDataId());
+            outputStream.writeObject(messagePayload);
+            System.out.println("Consensus lookup failed");
+        }
+
+    }
+
 
     private void forwardToMulticastGroup(SensorDataPayload payload) {
 //        try (MulticastSocket multicastSocket = new MulticastSocket(MULTICAST_PORT)) {
@@ -133,6 +162,15 @@ public class IncomingConnectionHandler implements Runnable {
     } catch (NumberFormatException e) {
         System.out.println("Invalid multicast ID. Please provide a numeric value.");
     }
+    }
+    private void updateRoutingTable(Payload receivedPayload) {
+        ConcurrentHashMap<String, RoutingPacket> tempRoutingTable = receivedPayload.getRoutingTable();
+        for (Map.Entry<String, RoutingPacket> entry : tempRoutingTable.entrySet()) {
+            if (!entry.getKey().equals(ownNodeId)) {
+                routingTable.putIfAbsent(entry.getKey(), entry.getValue());
+            }
+        }
+        System.out.println("Updated routing table");
     }
 
 

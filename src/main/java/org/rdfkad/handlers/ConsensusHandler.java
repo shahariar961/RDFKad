@@ -1,88 +1,86 @@
 package org.rdfkad.handlers;
 
 import org.rdfkad.functions.XOR;
+import org.rdfkad.packets.Payload;
 import org.rdfkad.packets.RoutingPacket;
 import org.rdfkad.tables.AlarmMatrixObject;
-import org.rdfkad.tables.NodeConfig;
 import org.rdfkad.tables.RoutingTable;
 
 import java.io.IOException;
 import java.math.BigInteger;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.PriorityQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.stream.Collectors;
 
 public class ConsensusHandler {
-    private String ownNodeId;
-    private NodeConfig nodeConfig = NodeConfig.getInstance();
+    private RoutingTable routingMap = RoutingTable.getInstance();
+    private ConcurrentHashMap<String, RoutingPacket> routingTable;
+    private OutgoingConnectionHandler outgoingConnectionHandler = new OutgoingConnectionHandler();
 
-    public ConsensusHandler() {
-        this.ownNodeId = nodeConfig.getNodeId();
-    }
+    public boolean runConsensusAlgorithm( List<AlarmMatrixObject> alarmingNeighbors) {
+        routingTable = routingMap.getMap();
 
-    /**
-     * Selects the closest node based on XOR distance for the node's own ID and sends a payload to them.
-     *
-     * @param alarmMatrixObjects The list of AlarmMatrixObject to process.
-     */
-    public void processAlarmMatrixObjects(List<AlarmMatrixObject> alarmMatrixObjects) {
-        OutgoingConnectionHandler outgoingConnectionHandler = new OutgoingConnectionHandler();
 
-        for (AlarmMatrixObject alarmMatrixObject : alarmMatrixObjects) {
-            String dataAddress = alarmMatrixObject.getDataAddress();
-            String closestNodeId = findClosestNode(ownNodeId); // Use the node's own ID to find the closest node
-
-            if (closestNodeId != null) {
-                RoutingPacket routingPacket = RoutingTable.getInstance().getMap().get(closestNodeId);
-                if (routingPacket != null) {
-                    try {
-                        outgoingConnectionHandler.connectToNode("consensus", routingPacket, dataAddress);
-                        System.out.println("Sent consensus request to node: " + closestNodeId + " for data address: " + dataAddress);
-                    } catch (IOException e) {
-                        System.out.println("Failed to send consensus request to node: " + closestNodeId);
-                        e.printStackTrace();
+        List<Payload> uniqueNodes = alarmingNeighbors.stream()
+                .map(alarm -> {
+                    String nodeId = null;
+                    for (Map.Entry<String, RoutingPacket> entry : routingTable.entrySet()) {
+                        if (entry.getValue().getMulticastId() == alarm.getMulticastId()) {
+                            nodeId = entry.getKey();
+                            break;
+                        }
                     }
-                }
+                    return new Payload(nodeId, alarm.getDataAddress());
+                })
+                .distinct()
+                .collect(Collectors.toList());
+
+        CountDownLatch latch = new CountDownLatch(uniqueNodes.size() * 2); // Latch for each request to two nodes
+
+        for (Payload nodeData : uniqueNodes) {
+            // Find the nearest two nodes for each alarming neighbor
+            List<RoutingPacket> nearestTwoNodes = findNearestNodes(nodeData.getNodeId(), 2);
+            for (RoutingPacket node : nearestTwoNodes) {
+                sendConsensusRequest(node, nodeData.getDataId(), latch);
+            }
+        }
+
+        try {
+            latch.await();
+            return true; // Wait for all consensus requests to complete
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            System.out.println("Latch interrupted: " + e.getMessage());
+            return false;
+        }
+    }
+
+    private List<RoutingPacket> findNearestNodes(String nodeId, int numberOfNodes) {
+        return routingTable.entrySet().stream()
+                .sorted((entry1, entry2) -> {
+                    BigInteger distance1 = XOR.Distance(nodeId, entry1.getKey());
+                    BigInteger distance2 = XOR.Distance(nodeId, entry2.getKey());
+                    return distance1.compareTo(distance2);
+                })
+                .limit(numberOfNodes)
+                .map(Map.Entry::getValue)
+                .collect(Collectors.toList());
+    }
+
+    private void sendConsensusRequest(RoutingPacket node, String dataId, CountDownLatch latch) {
+        try {
+            boolean consensus = outgoingConnectionHandler.connectConsensus("consensus", node, dataId);
+            if (consensus) {
+                latch.countDown(); // Decrement the latch count after the request completes
             } else {
-                System.out.println("No closest node found for data address: " + dataAddress);
+                throw new Exception("Consensus request failed.");
             }
-        }
-    }
-
-    /**
-     * Finds the closest node based on XOR distance for the given node ID.
-     *
-     * @param nodeId The node ID to use for calculating XOR distance.
-     * @return The node ID of the closest node.
-     */
-    private String findClosestNode(String nodeId) {
-        Comparator<NodeDistancePair> comparator = Comparator.comparing(pair -> pair.distance);
-        PriorityQueue<NodeDistancePair> queue = new PriorityQueue<>(comparator);
-
-        Map<String, RoutingPacket> routingTable = RoutingTable.getInstance().getMap();
-        for (Map.Entry<String, RoutingPacket> entry : routingTable.entrySet()) {
-            String otherNodeId = entry.getKey();
-            if (!otherNodeId.equals(ownNodeId)) {
-                BigInteger distance = XOR.Distance(nodeId, otherNodeId);
-                queue.add(new NodeDistancePair(otherNodeId, distance));
-            }
-        }
-
-        if (!queue.isEmpty()) {
-            return queue.poll().nodeId;
-        }
-
-        return null;
-    }
-
-    private static class NodeDistancePair {
-        String nodeId;
-        BigInteger distance;
-
-        NodeDistancePair(String nodeId, BigInteger distance) {
-            this.nodeId = nodeId;
-            this.distance = distance;
+        } catch (IOException e) {
+            System.out.println("Error sending consensus request: " + e.getMessage());
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
         }
     }
 }

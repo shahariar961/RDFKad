@@ -14,6 +14,11 @@ public class RoutingPacket implements Serializable{
         this.host = host;
 
     }
+    public RoutingPacket(Integer port,  Integer multicastId){
+        this.port = port;
+        this.multicastId= multicastId;
+
+    }
 
     public RoutingPacket(Integer port, String host, Integer multicastId){
         this.port = port;
