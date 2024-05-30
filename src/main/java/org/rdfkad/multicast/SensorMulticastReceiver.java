@@ -18,7 +18,9 @@ import java.net.InetAddress;
 import java.net.MulticastSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -31,12 +33,13 @@ public class SensorMulticastReceiver implements Runnable {
     private RDFDataHandler rdfDataHandler = new RDFDataHandler();
     private NodeConfig nodeConfig = NodeConfig.getInstance();
     private KademliaMatrix kademliaMatrix = KademliaMatrix.getInstance();
-
     private ConsensusHandler consensusHandler = new ConsensusHandler();
+
     private boolean selfAlarmState;
-    private int currentAlarmTier ;
+    private int currentAlarmTier;
     private MulticastSocket multicastSocket;
     private final ExecutorService senderPool = Executors.newSingleThreadExecutor();
+    private static final Map<Integer, Long> receiveTimestamps = new HashMap<>();
 
     @Override
     public void run() {
@@ -60,8 +63,10 @@ public class SensorMulticastReceiver implements Runnable {
                         int ownMulticastId = nodeConfig.getMulticastId();
                         String request = payload.getRequest();
 
-
                         if ("sensor info".equals(request)) {
+                            // Record the receive timestamp
+                            receiveTimestamps.put(uniqueId, System.currentTimeMillis());
+
                             if (ownMulticastId == uniqueId) {
                                 System.out.println("Received relevant payload:");
                                 System.out.println("Unique ID: " + payload.getUniqueId());
@@ -79,14 +84,11 @@ public class SensorMulticastReceiver implements Runnable {
                                     handleTemperatureBelowThreshold(ownMulticastId, dataAddress);
                                 }
                             }
-                        } else if (("alarm p1".equals(request) || "alarm p2".equals(request) || "alarm p3".equals(request))  &&  uniqueId != ownMulticastId) {
+                        } else if (("alarm p1".equals(request) || "alarm p2".equals(request) || "alarm p3".equals(request)) && uniqueId != ownMulticastId) {
                             String payloadDataAddress = payload.getDataAddress();
-                                kademliaMatrix.activateAlarmById(uniqueId, payloadDataAddress);
-                                System.out.println("Alarm Status p1 Temp Alarm on Node: " + uniqueId);
-
-
-
-                        }else if ("alarm off".equals(request)) {
+                            kademliaMatrix.activateAlarmById(uniqueId, payloadDataAddress);
+                            System.out.println("Alarm Status p1 Temp Alarm on Node: " + uniqueId);
+                        } else if ("alarm off".equals(request)) {
                             kademliaMatrix.deactivateAlarmById(uniqueId);
                         }
                     }
@@ -117,6 +119,7 @@ public class SensorMulticastReceiver implements Runnable {
         selfAlarmState = nodeConfig.getSelfAlarmState();
         currentAlarmTier = nodeConfig.getCurrentAlarmTier();
         System.out.println(alarmingNeighbors);
+
         if (!selfAlarmState) {
             if (alarmingNeighbors.isEmpty()) {
                 AlarmMatrixObject ownAlarm = new AlarmMatrixObject(true, ownMulticastId, dataAddress);
@@ -128,6 +131,7 @@ public class SensorMulticastReceiver implements Runnable {
                 if (consensusHandler.runConsensusAlgorithm(alarmingNeighbors)) {
                     nodeConfig.setCurrentAlarmTier(2);
                     sendUnicastMessage(ownMulticastId, dataAddress, "alarm p1");
+                    recordConsensusTimestampAndCalculateLatency(ownMulticastId);
                 }
             } else if (alarmingNeighbors.size() == 1) {
                 AlarmMatrixObject ownAlarm = new AlarmMatrixObject(true, ownMulticastId, dataAddress);
@@ -139,6 +143,7 @@ public class SensorMulticastReceiver implements Runnable {
                     nodeConfig.setCurrentAlarmTier(2);
                     sendUnicastMessage(ownMulticastId, dataAddress, "alarm p2");
                     nodeConfig.setSelfAlarmState(true);
+                    recordConsensusTimestampAndCalculateLatency(ownMulticastId);
                 }
             } else if (alarmingNeighbors.size() == 2) {
                 AlarmMatrixObject ownAlarm = new AlarmMatrixObject(true, ownMulticastId, dataAddress);
@@ -149,12 +154,24 @@ public class SensorMulticastReceiver implements Runnable {
                 if (consensusHandler.runConsensusAlgorithm(alarmingNeighbors)) {
                     nodeConfig.setCurrentAlarmTier(3);
                     sendUnicastMessage(ownMulticastId, dataAddress, "alarm p3");
+                    recordConsensusTimestampAndCalculateLatency(ownMulticastId);
+                }
+            }
+            else if (alarmingNeighbors.size() == 3) {
+                AlarmMatrixObject ownAlarm = new AlarmMatrixObject(true, ownMulticastId, dataAddress);
+                System.out.println("One Neighbour is Alarming, Starting P1 Alarm, Seeking Consensus to Upgrade Alarm");
+                kademliaMatrix.activateAlarmById(ownMulticastId, dataAddress);
+                alarmingNeighbors.add(ownAlarm);
+                nodeConfig.setSelfAlarmState(true);
+                if (consensusHandler.runConsensusAlgorithm(alarmingNeighbors)) {
+                    nodeConfig.setCurrentAlarmTier(4);
+                    sendUnicastMessage(ownMulticastId, dataAddress, "alarm p4");
+                    recordConsensusTimestampAndCalculateLatency(ownMulticastId);
                 }
             }
         } else {
             System.out.println("Alarm already activated");
         }
-
     }
 
     private void handleTemperatureBelowThreshold(int ownMulticastId, String dataAddress) {
@@ -179,6 +196,21 @@ public class SensorMulticastReceiver implements Runnable {
             System.out.println("Sent unicast message to bootstrap server");
         } catch (IOException e) {
             System.out.println("Error sending unicast message: " + e.getMessage());
+        }
+    }
+
+    private void recordConsensusTimestampAndCalculateLatency(int uniqueId) {
+        // Record the consensus timestamp
+        long consensusTimestamp = System.currentTimeMillis();
+
+        // Retrieve the receive timestamp
+        Long receiveTimestamp = receiveTimestamps.get(uniqueId);
+        if (receiveTimestamp != null) {
+            // Calculate and print the latency
+            long latency = consensusTimestamp - receiveTimestamp;
+            System.out.println("Latency from receiving to consensus for multicast ID " + uniqueId + ": " + latency + " ms");
+        } else {
+            System.out.println("Receive timestamp not found for multicast ID: " + uniqueId);
         }
     }
 }

@@ -37,7 +37,7 @@ public class MulticastMessagePrinter implements Runnable {
                      ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream)) {
 
                     SensorDataPayload receivedPayload = (SensorDataPayload) objectInputStream.readObject();
-                    System.out.println("Received message from Node: " + receivedPayload.getUniqueId() + "Alarm type " + receivedPayload.getRequest());
+                    System.out.println("Received message from Node: " + receivedPayload.getUniqueId() + " Alarm type " + receivedPayload.getRequest());
 
                     // Calculate the latency using the stored send timestamp
                     int multicastId = receivedPayload.getUniqueId();

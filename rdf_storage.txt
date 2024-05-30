@@ -1,0 +1,4 @@
+Subject: subject, Predicate: object, Object: object
+Subject: subject, Predicate: object, Object: object
+Subject: subject, Predicate: predicate, Object: object
+Subject: subject, Predicate: predicate, Object: object
