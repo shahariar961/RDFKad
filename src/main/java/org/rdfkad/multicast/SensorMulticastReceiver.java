@@ -65,7 +65,7 @@ public class SensorMulticastReceiver implements Runnable {
 
                         if ("sensor info".equals(request)) {
                             // Record the receive timestamp
-                            receiveTimestamps.put(uniqueId, System.currentTimeMillis());
+
 
                             if (ownMulticastId == uniqueId) {
                                 System.out.println("Received relevant payload:");
@@ -128,6 +128,7 @@ public class SensorMulticastReceiver implements Runnable {
                 kademliaMatrix.activateAlarmById(ownMulticastId, dataAddress);
                 nodeConfig.setCurrentAlarmTier(1);
                 nodeConfig.setSelfAlarmState(true);
+                receiveTimestamps.put(ownMulticastId ,System.currentTimeMillis());
                 if (consensusHandler.runConsensusAlgorithm(alarmingNeighbors)) {
                     nodeConfig.setCurrentAlarmTier(2);
                     sendUnicastMessage(ownMulticastId, dataAddress, "alarm p1");
@@ -138,7 +139,7 @@ public class SensorMulticastReceiver implements Runnable {
                 System.out.println("One Neighbour is Alarming, Starting P1 Alarm, Seeking Consensus to Upgrade Alarm");
                 kademliaMatrix.activateAlarmById(ownMulticastId, dataAddress);
                 alarmingNeighbors.add(ownAlarm);
-
+                receiveTimestamps.put(ownMulticastId ,System.currentTimeMillis());
                 if (consensusHandler.runConsensusAlgorithm(alarmingNeighbors)) {
                     nodeConfig.setCurrentAlarmTier(2);
                     sendUnicastMessage(ownMulticastId, dataAddress, "alarm p2");
@@ -151,18 +152,20 @@ public class SensorMulticastReceiver implements Runnable {
                 kademliaMatrix.activateAlarmById(ownMulticastId, dataAddress);
                 alarmingNeighbors.add(ownAlarm);
                 nodeConfig.setSelfAlarmState(true);
+                receiveTimestamps.put(ownMulticastId, System.currentTimeMillis());
                 if (consensusHandler.runConsensusAlgorithm(alarmingNeighbors)) {
                     nodeConfig.setCurrentAlarmTier(3);
                     sendUnicastMessage(ownMulticastId, dataAddress, "alarm p3");
                     recordConsensusTimestampAndCalculateLatency(ownMulticastId);
                 }
             }
-            else if (alarmingNeighbors.size() == 3) {
+            else if (alarmingNeighbors.size() >= 3) {
                 AlarmMatrixObject ownAlarm = new AlarmMatrixObject(true, ownMulticastId, dataAddress);
                 System.out.println("One Neighbour is Alarming, Starting P1 Alarm, Seeking Consensus to Upgrade Alarm");
                 kademliaMatrix.activateAlarmById(ownMulticastId, dataAddress);
                 alarmingNeighbors.add(ownAlarm);
                 nodeConfig.setSelfAlarmState(true);
+                receiveTimestamps.put(ownMulticastId, System.currentTimeMillis());
                 if (consensusHandler.runConsensusAlgorithm(alarmingNeighbors)) {
                     nodeConfig.setCurrentAlarmTier(4);
                     sendUnicastMessage(ownMulticastId, dataAddress, "alarm p4");

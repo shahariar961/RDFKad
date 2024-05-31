@@ -16,6 +16,7 @@ import java.net.Socket;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -28,6 +29,7 @@ public class BootstrapServer {
     private static final int MULTICAST_PORT = 4446;
     private final ExecutorService connectionPool;
     private static Map<Integer, Long> sendTimestamps = new HashMap<>(); // Map to store timestamps
+    private static final Random random = new Random(); // Initialize Random instance
 
     public BootstrapServer() {
         this.connectionPool = Executors.newCachedThreadPool();
@@ -66,7 +68,7 @@ public class BootstrapServer {
         BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
         while (true) {
             try {
-                System.out.print("Enter command (send temp data  <multicast id>  <value> ): ");
+                System.out.print("Enter command (send temp data <multicast id> <value> or send random integer <count>): ");
                 String command = reader.readLine().trim();
 
                 if (command.startsWith("send data ")) {
@@ -89,6 +91,18 @@ public class BootstrapServer {
                     } catch (NumberFormatException e) {
                         System.out.println("Invalid multicast ID. Please provide a numeric value.");
                     }
+                } else if (command.startsWith("send random ")) {
+                    String[] tokens = command.split(" ");
+                    if (tokens.length != 3) {
+                        System.out.println("Invalid command format. Expected: send random integer <count>");
+                        continue;
+                    }
+                    try {
+                        int count = Integer.parseInt(tokens[2]);
+                        sendRandomSensorData(count);
+                    } catch (NumberFormatException e) {
+                        System.out.println("Invalid count. Please provide a numeric value.");
+                    }
                 } else if (command.startsWith("show routing")) {
                     if (routingTable.isEmpty()) {
                         System.out.println("Routing table is empty");
@@ -98,8 +112,7 @@ public class BootstrapServer {
                             System.out.println(entry.getValue().getPort());
                         }
                     }
-                }
-                else if (command.startsWith("update routing")){
+                } else if (command.startsWith("update routing")) {
                     OutgoingConnectionHandler handler = new OutgoingConnectionHandler();
                     for (Map.Entry<String, RoutingPacket> entry : routingTable.entrySet()) {
                         String nodeId = entry.getKey();
@@ -111,7 +124,6 @@ public class BootstrapServer {
 
                         handler.connectToBootstrapServer("update routing", host, port);
                     }
-
                 } else if (command.startsWith("time")) {
                     List<Long> latencies = MulticastMessagePrinter.getLatencies();
                     if (latencies.isEmpty()) {
@@ -126,6 +138,16 @@ public class BootstrapServer {
                 e.printStackTrace();
             }
         }
+    }
+
+    private static void sendRandomSensorData(int count) {
+        for (int i = 0; i < count; i++) {
+            int randomId = random.nextInt(40) + 1; // Random multicast ID between 1 and 40
+            int randomTemperature = random.nextBoolean() ? 35 : 50;
+            SensorMulticastSender.sensorDataMessageSender(randomId, randomTemperature, "sensor info");
+            System.out.println("Sent random data to multicast ID " + randomId + " with temperature " + randomTemperature);
+        }
+        System.out.println("Sent " + count + " random data messages.");
     }
 
     public static long getSendTimestamp(int multicastId) {
