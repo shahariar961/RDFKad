@@ -1,41 +1,45 @@
 package org.rdfkad.packets;
 
-
 import java.io.Serializable;
-public class RoutingPacket implements Serializable{
-    public Integer port;
-    public  String host = "localhost";
-    public   Integer multicastId ;
-    public RoutingPacket(Integer port){
-        this.port = port;
-            }
-    public RoutingPacket(Integer port, String host){
-        this.port = port;
-        this.host = host;
+import java.net.InetAddress;
 
-    }
-    public RoutingPacket(Integer port,  Integer multicastId){
-        this.port = port;
-        this.multicastId= multicastId;
+public class RoutingPacket implements Serializable {
+    private InetAddress address;
+    private Integer port;
+    private Integer multicastId;
 
+    public RoutingPacket(InetAddress address, Integer port) {
+        this.address = address;
+        this.port = port;
     }
 
-    public RoutingPacket(Integer port, String host, Integer multicastId){
+    public RoutingPacket(InetAddress address, Integer port, Integer multicastId) {
+        this.address = address;
         this.port = port;
-        this.host = host;
-        this.multicastId= multicastId;
-
+        this.multicastId = multicastId;
     }
 
-    public  Integer getPort() {
+    public InetAddress getAddress() {
+        return address;
+    }
+
+    public Integer getPort() {
         return port;
-    }
-
-    public String getHost() {
-        return host;
     }
 
     public Integer getMulticastId() {
         return multicastId;
+    }
+
+    public void setAddress(InetAddress address) {
+        this.address = address;
+    }
+
+    public void setPort(Integer port) {
+        this.port = port;
+    }
+
+    public void setMulticastId(Integer multicastId) {
+        this.multicastId = multicastId;
     }
 }

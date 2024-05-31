@@ -29,15 +29,14 @@ public class OutgoingConnectionHandler {
         if (routingPacket == null) {
             throw new IOException("No routing information available for nodeId: ");
         }
-        try (Socket socket = new Socket(routingPacket.getHost(), routingPacket.getPort());
+        try (Socket socket = new Socket(routingPacket.getAddress(), routingPacket.getPort());
              ObjectOutputStream outputStream = new ObjectOutputStream(socket.getOutputStream());
              ObjectInputStream inputStream = new ObjectInputStream(socket.getInputStream())) {
 
             Payload messagePayload;
-             if (request.equals("consensus")) {
+            if (request.equals("consensus")) {
                 messagePayload = new Payload(request, ownNodeId, nodePort, dataId);
                 outputStream.writeObject(messagePayload);
-
             }
 
             Object receivedObject = inputStream.readObject();
@@ -55,7 +54,7 @@ public class OutgoingConnectionHandler {
         if (routingPacket == null) {
             throw new IOException("No routing information available for nodeId: ");
         }
-        try (Socket socket = new Socket(routingPacket.getHost(), routingPacket.getPort());
+        try (Socket socket = new Socket(routingPacket.getAddress(), routingPacket.getPort());
              ObjectOutputStream outputStream = new ObjectOutputStream(socket.getOutputStream());
              ObjectInputStream inputStream = new ObjectInputStream(socket.getInputStream())) {
 
@@ -70,7 +69,6 @@ public class OutgoingConnectionHandler {
             } else if (request.equals("consensus")) {
                 messagePayload = new Payload(request, ownNodeId, nodePort, dataId);
                 outputStream.writeObject(messagePayload);
-
             }
 
             Object receivedObject = inputStream.readObject();
@@ -113,42 +111,42 @@ public class OutgoingConnectionHandler {
         }
         return false;
     }
+
     public Boolean connectConsensus(String request, RoutingPacket routingPacket, String dataId) throws IOException {
         if (routingPacket == null) {
             throw new IOException("No routing information available for nodeId: ");
         }
-        try (Socket socket = new Socket(routingPacket.getHost(), routingPacket.getPort());
+        try (Socket socket = new Socket(routingPacket.getAddress(), routingPacket.getPort());
              ObjectOutputStream outputStream = new ObjectOutputStream(socket.getOutputStream());
              ObjectInputStream inputStream = new ObjectInputStream(socket.getInputStream())) {
 
             Payload messagePayload;
-             if (request.equals("consensus")) {
+            if (request.equals("consensus")) {
                 messagePayload = new Payload(request, ownNodeId, nodePort, dataId);
                 outputStream.writeObject(messagePayload);
-
             }
             Object receivedObject = inputStream.readObject();
             if (receivedObject instanceof Payload) {
                 Payload receivedPayload = (Payload) receivedObject;
                 if (handleReceivedPayload(receivedPayload, dataId)) {
                     return true;
-                }else {
+                } else {
                     return false;
                 }
-                }
-
+            }
         } catch (IOException | ClassNotFoundException e) {
             throw new RuntimeException(e);
         }
         return false;
     }
+
     public void connectToBootstrapServer(String request, String host, int port) {
         try (Socket socket = new Socket(host, port);
              ObjectOutputStream outputStream = new ObjectOutputStream(socket.getOutputStream());
              ObjectInputStream inputStream = new ObjectInputStream(socket.getInputStream())) {
-           if (request.equals("update routing")) {
+            if (request.equals("update routing")) {
                 refreshRoutingBootstrapServer(request, outputStream);
-            }else {
+            } else {
                 Payload messagePayload = new Payload(request, ownNodeId, nodePort);
                 outputStream.writeObject(messagePayload);
 
@@ -166,19 +164,19 @@ public class OutgoingConnectionHandler {
             e.printStackTrace();
         }
     }
+
     public void refreshRoutingBootstrapServer(String request, ObjectOutputStream outputStream) throws IOException {
-        routingTable= RoutingTable.getInstance().getMap();
+        routingTable = RoutingTable.getInstance().getMap();
         Payload messagePayload = new Payload("update routing", routingTable);
-            outputStream.writeObject(messagePayload);
+        outputStream.writeObject(messagePayload);
     }
 
-   private void handleRegistration(Payload receivedPayload) {
+    private void handleRegistration(Payload receivedPayload) {
         nodeConfig.setNodeId(receivedPayload.getNodeId());
         nodeConfig.setMulticastId(receivedPayload.getMulticastId());
         System.out.println("Registered to Network with ID: " + receivedPayload.getNodeId() + " Multicast id: " + receivedPayload.getMulticastId());
         updateRoutingTable(receivedPayload);
     }
-
 
     private void updateRoutingTable(Payload receivedPayload) {
         ConcurrentHashMap<String, RoutingPacket> tempRoutingTable = receivedPayload.getRoutingTable();

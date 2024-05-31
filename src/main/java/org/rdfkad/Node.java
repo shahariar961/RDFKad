@@ -12,6 +12,7 @@ import org.rdfkad.tables.RoutingTable;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Map;
@@ -24,34 +25,37 @@ public class Node {
     private static ConcurrentHashMap<String, RoutingPacket> routingTable = RoutingTable.getInstance().getMap();
     private static ConcurrentHashMap<String, Object> dataTable = DataTable.getInstance().getMap();
     private static NodeConfig nodeConfig = NodeConfig.getInstance();
-    private static Integer nodePort = NodeConfig.getInstance().getNodePort();
     private final ExecutorService connectionPool;
     private final ExecutorService multicastReceiverPool;
+
+    private static final String BOOTSTRAP_SERVER_IP = "host.docker.internal";
+    private static final int BOOTSTRAP_SERVER_PORT = 9090;
 
     public Node() {
         this.connectionPool = Executors.newCachedThreadPool();
         this.multicastReceiverPool = Executors.newCachedThreadPool();
     }
 
-    public void startServer(int port) {
+    public void startServer(InetAddress address, int port) {
         try {
-            serverSocket = new ServerSocket(port);
-            System.out.println("Node listening on port " + port);
+            serverSocket = new ServerSocket(port, 50, address);
+            System.out.println("Node listening on " + address.getHostAddress() + ":" + port);
 
             // Start listening for incoming connections
             connectionPool.submit(this::listenForConnections);
 
             // Start the multicast receiver in a separate thread
-            //multicastReceiverPool.submit(new SensorMulticastReceiver());
             multicastReceiverPool.submit(this::listenForMulticast);
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
+
     public void listenForMulticast() {
         SensorMulticastReceiver multicastReceiver = new SensorMulticastReceiver();
         multicastReceiver.run(); // Start the receiver in the current thread
     }
+
     public void listenForConnections() {
         while (true) {
             try {
@@ -65,23 +69,34 @@ public class Node {
         }
     }
 
-    public void connectToBootstrapServer(String request, String host, int port) {
+    public void connectToBootstrapServer(String request) {
+        long startTime = System.currentTimeMillis(); // Start time for latency measurement
         OutgoingConnectionHandler handler = new OutgoingConnectionHandler();
-        handler.connectToBootstrapServer(request, host, port);
+        handler.connectToBootstrapServer(request, BOOTSTRAP_SERVER_IP, BOOTSTRAP_SERVER_PORT);
+        long endTime = System.currentTimeMillis(); // End time for latency measurement
+        System.out.println("Latency to connect to bootstrap server: " + (endTime - startTime) + " ms");
     }
 
     public static void main(String[] args) {
-        Node node = new Node();
-        if (args.length != 1) {
-            System.out.println("Usage: java Node <port>");
+        if (args.length != 2) {
+            System.out.println("Usage: java Node <address> <port>");
             System.exit(1);
         }
 
-        int port = Integer.parseInt(args[0]);
+        String address = args[0];
+        int port = Integer.parseInt(args[1]);
+
+        Node node = new Node();
         nodeConfig.setNodePort(port);
-        System.out.println("Listening on port " + port);
-        node.startServer(port);
-        node.connectToBootstrapServer("register", "localhost", 9090);
+        System.out.println("Starting Node on " + address + ":" + port);
+
+        try {
+            InetAddress inetAddress = InetAddress.getByName(address);
+            node.startServer(inetAddress, port);
+            node.connectToBootstrapServer("register");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
         BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
         while (true) {
@@ -90,7 +105,7 @@ public class Node {
                 String command = reader.readLine().trim();
 
                 if (command.startsWith("refresh routing")) {
-                    node.connectToBootstrapServer("refresh routing", "localhost", 9090);
+                    node.connectToBootstrapServer("refresh routing");
                 } else if (command.startsWith("show routing")) {
                     if (routingTable.isEmpty()) {
                         System.out.println("Routing table is empty");
@@ -109,7 +124,7 @@ public class Node {
                     }
                     String dataId = tokens[2];
                     DataFinder dataFinder = new DataFinder();
-                     dataFinder.findCompositeData(dataId);
+                    dataFinder.findCompositeData(dataId);
                 } else if (command.startsWith("store data")) {
                     String[] tokens = command.split(" ");
                     if (tokens.length != 4) {

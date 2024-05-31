@@ -70,7 +70,6 @@ public class DataHandler {
             // Example: localDataStore.put(dataId, payload);
         } else {
             RoutingPacket routingPacket = RoutingTable.getInstance().getMap().get(closestNodeId);
-            System.out.println("Data ID is closest to node " + closestNodeId + ". Forwarding to node " + routingPacket.getHost() + ":" + routingPacket.getPort());
             OutgoingConnectionHandler outgoingConnectionHandler = new OutgoingConnectionHandler();
             outgoingConnectionHandler.connectToNode("store", routingPacket, dataId);
         }

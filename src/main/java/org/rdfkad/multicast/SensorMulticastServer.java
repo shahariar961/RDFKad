@@ -29,7 +29,7 @@ public class SensorMulticastServer implements Runnable {
                 DatagramPacket packet = new DatagramPacket(buf, buf.length);
                 socket.receive(packet);
                 // Handle the received data here
-               // System.out.println("Received data: " + new String(packet.getData(), 0, packet.getLength()));
+                // System.out.println("Received data: " + new String(packet.getData(), 0, packet.getLength()));
             } catch (IOException e) {
                 System.out.println("IOException in listener: " + e.getMessage());
                 break;  // Exit if the socket encounters an error

@@ -11,6 +11,7 @@ import org.rdfkad.tables.RoutingTable;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.HashMap;
@@ -35,7 +36,8 @@ public class BootstrapServer {
 
     public void start(int port) {
         try {
-            serverSocket = new ServerSocket(port);
+            InetAddress localHostAddress = InetAddress.getLocalHost();
+            serverSocket = new ServerSocket(port, 50, localHostAddress);
             System.out.println("Bootstrap Server listening on port " + port);
             SensorMulticastServer multicastServer = new SensorMulticastServer();
 
@@ -96,20 +98,20 @@ public class BootstrapServer {
                         for (Map.Entry<String, RoutingPacket> entry : routingTable.entrySet()) {
                             System.out.println(entry.getKey());
                             System.out.println(entry.getValue().getPort());
+                            System.out.println(entry.getValue().getAddress().getHostAddress());
                         }
                     }
-                }
-                else if (command.startsWith("update routing")){
+                } else if (command.startsWith("update routing")) {
                     OutgoingConnectionHandler handler = new OutgoingConnectionHandler();
                     for (Map.Entry<String, RoutingPacket> entry : routingTable.entrySet()) {
                         String nodeId = entry.getKey();
                         RoutingPacket routingPacket = entry.getValue();
-                        String host = routingPacket.getHost();
+                        InetAddress address = routingPacket.getAddress();
                         int port = routingPacket.getPort();
 
                         System.out.println("Connecting to Node ID: " + nodeId);
 
-                        handler.connectToBootstrapServer("update routing", host, port);
+                        handler.connectToBootstrapServer("update routing", address.getHostAddress(), port);
                     }
 
                 } else if (command.startsWith("time")) {

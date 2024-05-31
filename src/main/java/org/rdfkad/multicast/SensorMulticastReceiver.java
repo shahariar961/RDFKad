@@ -9,7 +9,6 @@ import org.rdfkad.matrix.KademliaMatrix;
 import org.rdfkad.tables.AlarmMatrixObject;
 
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -27,7 +26,7 @@ import java.util.concurrent.Executors;
 public class SensorMulticastReceiver implements Runnable {
     private static final String MULTICAST_GROUP = "230.0.0.1";
     private static final int MULTICAST_PORT = 4446;
-    private static final String BOOTSTRAP_SERVER_HOST = "localhost";
+    private static final String BOOTSTRAP_SERVER_HOST = "host.docker.internal";
     private static final int BOOTSTRAP_SERVER_PORT = 9090;
 
     private RDFDataHandler rdfDataHandler = new RDFDataHandler();
@@ -156,8 +155,7 @@ public class SensorMulticastReceiver implements Runnable {
                     sendUnicastMessage(ownMulticastId, dataAddress, "alarm p3");
                     recordConsensusTimestampAndCalculateLatency(ownMulticastId);
                 }
-            }
-            else if (alarmingNeighbors.size() == 3) {
+            } else if (alarmingNeighbors.size() == 3) {
                 AlarmMatrixObject ownAlarm = new AlarmMatrixObject(true, ownMulticastId, dataAddress);
                 System.out.println("One Neighbour is Alarming, Starting P1 Alarm, Seeking Consensus to Upgrade Alarm");
                 kademliaMatrix.activateAlarmById(ownMulticastId, dataAddress);

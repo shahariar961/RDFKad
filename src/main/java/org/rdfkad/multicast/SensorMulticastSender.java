@@ -19,10 +19,8 @@ public class SensorMulticastSender {
     private static ConcurrentHashMap<String, RoutingPacket> routingTable = RoutingTable.getInstance().getMap();
 
     public static void sensorDataMessageSender(int multicastId, int message, String request) {
-
         RDFPacket sensorInfo = new RDFPacket("Sensor" + multicastId, "http://www.w3.org/1999/02/22-rdf-syntax-ns#type", String.valueOf(message));
         SensorDataPayload payload = new SensorDataPayload(multicastId, sensorInfo, request);
-
 
         // Serialize the SensorDataPayload object
         try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
@@ -45,8 +43,9 @@ public class SensorMulticastSender {
             System.out.println("Error during serialization: " + e.getMessage());
         }
     }
-    public static void sensorDataMessageSender(int multicastid, String dataAddress, String request) {;
-        SensorDataPayload payload = new SensorDataPayload(multicastid, dataAddress, request);
+
+    public static void sensorDataMessageSender(int multicastId, String dataAddress, String request) {
+        SensorDataPayload payload = new SensorDataPayload(multicastId, dataAddress, request);
 
         // Serialize the SensorDataPayload object
         try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();

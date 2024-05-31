@@ -10,9 +10,7 @@ import org.rdfkad.tables.RoutingTable;
 import org.rdfkad.tables.NodeConfig;
 
 import java.io.*;
-import java.net.DatagramPacket;
 import java.net.InetAddress;
-import java.net.MulticastSocket;
 import java.net.Socket;
 import java.util.HashMap;
 import java.util.Map;
@@ -69,11 +67,10 @@ public class IncomingConnectionHandler implements Runnable {
                         break;
                     case "consensus":
                         handleConsensusRequest(receivedPayload, outputStream);
-
                         break;
                     case "update routing":
                         updateRoutingTable(receivedPayload);
-                    break;
+                        break;
                     default:
                         System.out.println("Unknown request: " + receivedPayload.getRequest());
                 }
@@ -115,10 +112,11 @@ public class IncomingConnectionHandler implements Runnable {
     private void handleRegisterRequest(Payload receivedPayload, ObjectOutputStream outputStream) throws IOException {
         int multicastId = routingTable.size() + 1;
         String generatedNodeId = IDGenerator.generateNodeId();
+        InetAddress clientAddress = socket.getInetAddress();
         Payload messagePayload = new Payload("registered", generatedNodeId, routingTable, multicastId);
-        routingTable.put(generatedNodeId, new RoutingPacket(receivedPayload.getPort(), multicastId));
+        routingTable.put(generatedNodeId, new RoutingPacket(clientAddress, receivedPayload.getPort(), multicastId));
         outputStream.writeObject(messagePayload);
-        System.out.println("Node registered with ID: " + generatedNodeId + " Multicast id: " + multicastId);
+        System.out.println("Node registered with ID: " + generatedNodeId + " Multicast id: " + multicastId + " Address: " + clientAddress.getHostAddress());
     }
 
     private void handleRefreshRoutingRequest(Payload receivedPayload, ObjectOutputStream outputStream) throws IOException {
@@ -126,8 +124,8 @@ public class IncomingConnectionHandler implements Runnable {
         outputStream.writeObject(messagePayload);
         System.out.println("Sent routing data to Node: " + receivedPayload.getNodeId());
     }
-    private void handleConsensusRequest(Payload receivedPayload, ObjectOutputStream outputStream) throws IOException {
 
+    private void handleConsensusRequest(Payload receivedPayload, ObjectOutputStream outputStream) throws IOException {
         int objectValue = Integer.parseInt(dataFinder.findCompositeData(receivedPayload.getDataId()));
         if (objectValue > Threshold) {
             Payload messagePayload = new Payload("ok consensus", receivedPayload.getNodeId(), receivedPayload.getPort(), receivedPayload.getDataId());
@@ -138,31 +136,16 @@ public class IncomingConnectionHandler implements Runnable {
             outputStream.writeObject(messagePayload);
             System.out.println("Consensus lookup failed");
         }
-
     }
-
 
     private void forwardToMulticastGroup(SensorDataPayload payload) {
-//        try (MulticastSocket multicastSocket = new MulticastSocket(MULTICAST_PORT)) {
-//            InetAddress group = InetAddress.getByName(MULTICAST_GROUP);
-//
-//            // Serialize the payload
-//            ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-//            ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream);
-//            objectOutputStream.writeObject(payload);
-//            objectOutputStream.flush();
-//            byte[] buf = byteArrayOutputStream.toByteArray();
-//
-//            // Send the packet to the multicast group
-//            DatagramPacket packet = new DatagramPacket(buf, buf.length, group, MULTICAST_PORT);
-//            multicastSocket.send(packet);
-//            System.out.println("Forwarded message to multicast group");
         try {
-        SensorMulticastSender.sensorDataMessageSender(payload.getUniqueId(), payload.getDataAddress(), payload.getRequest());
-    } catch (NumberFormatException e) {
-        System.out.println("Invalid multicast ID. Please provide a numeric value.");
+            SensorMulticastSender.sensorDataMessageSender(payload.getUniqueId(), payload.getDataAddress(), payload.getRequest());
+        } catch (NumberFormatException e) {
+            System.out.println("Invalid multicast ID. Please provide a numeric value.");
+        }
     }
-    }
+
     private void updateRoutingTable(Payload receivedPayload) {
         ConcurrentHashMap<String, RoutingPacket> tempRoutingTable = receivedPayload.getRoutingTable();
         for (Map.Entry<String, RoutingPacket> entry : tempRoutingTable.entrySet()) {
@@ -172,6 +155,4 @@ public class IncomingConnectionHandler implements Runnable {
         }
         System.out.println("Updated routing table");
     }
-
-
 }
