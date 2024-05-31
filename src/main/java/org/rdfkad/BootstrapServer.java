@@ -37,7 +37,7 @@ public class BootstrapServer {
     public void start(int port) {
         try {
             InetAddress localHostAddress = InetAddress.getLocalHost();
-            serverSocket = new ServerSocket(port, 50, localHostAddress);
+            serverSocket = new ServerSocket(port, 50, InetAddress.getByName("0.0.0.0"));
             System.out.println("Bootstrap Server listening on port " + port);
             SensorMulticastServer multicastServer = new SensorMulticastServer();
 

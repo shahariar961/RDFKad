@@ -22,12 +22,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-
 public class SensorMulticastReceiver implements Runnable {
-    private static final String MULTICAST_GROUP = "230.0.0.1";
-    private static final int MULTICAST_PORT = 4446;
-    private static final String BOOTSTRAP_SERVER_HOST = "host.docker.internal";
-    private static final int BOOTSTRAP_SERVER_PORT = 9090;
+    private static final String MULTICAST_GROUP = System.getenv("MULTICAST_GROUP");
+    private static final int MULTICAST_PORT = Integer.parseInt(System.getenv("MULTICAST_PORT"));
+    private static final String BOOTSTRAP_SERVER_HOST = System.getenv("BOOTSTRAP_SERVER_HOST");
+    private static final int BOOTSTRAP_SERVER_PORT = Integer.parseInt(System.getenv("BOOTSTRAP_SERVER_PORT"));
 
     private RDFDataHandler rdfDataHandler = new RDFDataHandler();
     private NodeConfig nodeConfig = NodeConfig.getInstance();

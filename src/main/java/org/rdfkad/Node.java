@@ -9,9 +9,7 @@ import org.rdfkad.tables.DataTable;
 import org.rdfkad.tables.NodeConfig;
 import org.rdfkad.tables.RoutingTable;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -36,10 +34,10 @@ public class Node {
         this.multicastReceiverPool = Executors.newCachedThreadPool();
     }
 
-    public void startServer(InetAddress address, int port) {
+    public void startServer(int port) {
         try {
-            serverSocket = new ServerSocket(port, 50, address);
-            System.out.println("Node listening on " + address.getHostAddress() + ":" + port);
+            serverSocket = new ServerSocket(port, 50, InetAddress.getByName("0.0.0.0"));
+            System.out.println("Node listening on " + ":" + port);
 
             // Start listening for incoming connections
             connectionPool.submit(this::listenForConnections);
@@ -92,55 +90,18 @@ public class Node {
 
         try {
             InetAddress inetAddress = InetAddress.getByName(address);
-            node.startServer(inetAddress, port);
+            node.startServer(port);
             node.connectToBootstrapServer("register");
+
+            // Perform any predefined actions here instead of waiting for user input
+            node.connectToBootstrapServer("refresh routing");
+
+            // Example of predefined actions:
+            // node.connectToBootstrapServer("find data", "someDataId");
+            // node.connectToBootstrapServer("store data", "someDataId", "someDataValue");
+
         } catch (IOException e) {
             e.printStackTrace();
-        }
-
-        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
-        while (true) {
-            try {
-                System.out.print("Enter command (search data <data Id> or connect server <port> or store data <Id> <Value>): ");
-                String command = reader.readLine().trim();
-
-                if (command.startsWith("refresh routing")) {
-                    node.connectToBootstrapServer("refresh routing");
-                } else if (command.startsWith("show routing")) {
-                    if (routingTable.isEmpty()) {
-                        System.out.println("Routing table is empty");
-                    } else {
-                        for (Map.Entry<String, RoutingPacket> entry : routingTable.entrySet()) {
-                            System.out.println(entry.getKey());
-                            System.out.println(entry.getValue().getPort());
-                            System.out.println(entry.getValue().getMulticastId());
-                        }
-                    }
-                } else if (command.startsWith("find data")) {
-                    String[] tokens = command.split(" ");
-                    if (tokens.length != 3) {
-                        System.out.println("Invalid command format. Expected: find data <dataId>");
-                        continue;
-                    }
-                    String dataId = tokens[2];
-                    DataFinder dataFinder = new DataFinder();
-                    dataFinder.findCompositeData(dataId);
-                } else if (command.startsWith("store data")) {
-                    String[] tokens = command.split(" ");
-                    if (tokens.length != 4) {
-                        System.out.println("Invalid command format. Expected: store data <dataId> <dataValue>");
-                        continue;
-                    }
-                    String dataId = tokens[2];
-                    String dataValue = tokens[3];
-                    dataTable.put(dataId, dataValue);
-                    System.out.println("Data id " + dataId + " stored successfully");
-                } else {
-                    System.out.println("Unknown command. Available commands: refresh routing, show routing, find data, store data");
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
         }
     }
 }

@@ -10,8 +10,8 @@ import java.net.InetAddress;
 import java.net.MulticastSocket;
 
 public class SensorMulticastServer implements Runnable {
-    private static final int PORT = 4446;
-    private static final String MULTICAST_GROUP = "230.0.0.1";
+    private static final int PORT = Integer.parseInt(System.getenv("MULTICAST_PORT") != null ? System.getenv("MULTICAST_PORT") : "4446");
+    private static final String MULTICAST_GROUP = System.getenv("MULTICAST_GROUP") != null ? System.getenv("MULTICAST_GROUP") : "230.0.0.1";
     private MulticastSocket socket;
 
     // Constructor to set up the socket
