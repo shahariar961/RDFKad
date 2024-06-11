@@ -21,7 +21,7 @@ public class IDGenerator{
 
     private static String generateRandomBinaryId() {
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < 12; i++) {
+        for (int i = 0; i < 24; i++) {
             sb.append(random.nextBoolean() ? '1' : '0');
         }
         return sb.toString();

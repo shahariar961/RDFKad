@@ -7,6 +7,13 @@ import org.rdfkad.tables.NodeConfig;
 import org.rdfkad.handlers.RDFDataHandler;
 import org.rdfkad.matrix.KademliaMatrix;
 import org.rdfkad.tables.AlarmMatrixObject;
+import org.jeasy.rules.api.*;
+import org.jeasy.rules.core.DefaultRulesEngine;
+import org.jeasy.rules.api.Rules;
+import org.jeasy.rules.annotation.Action;
+import org.jeasy.rules.annotation.Condition;
+import org.jeasy.rules.annotation.Fact;
+import org.jeasy.rules.annotation.Rule;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -40,6 +47,7 @@ public class SensorMulticastReceiver implements Runnable {
     private MulticastSocket multicastSocket;
     private final ExecutorService senderPool = Executors.newSingleThreadExecutor();
     private static final Map<Integer, Long> receiveTimestamps = new HashMap<>();
+    private String dataIdAddress;
 
     @Override
     public void run() {
@@ -66,7 +74,6 @@ public class SensorMulticastReceiver implements Runnable {
                         if ("sensor info".equals(request)) {
                             // Record the receive timestamp
 
-
                             if (ownMulticastId == uniqueId) {
                                 System.out.println("Received relevant payload:");
                                 System.out.println("Unique ID: " + payload.getUniqueId());
@@ -75,14 +82,20 @@ public class SensorMulticastReceiver implements Runnable {
                                 int temperature = Integer.parseInt(rdfData.getObject());
                                 String dataAddress = rdfDataHandler.storeRDF(rdfData);
                                 System.out.println(dataAddress);
+                                dataIdAddress = dataAddress;
 
                                 System.out.println("Temperature: " + temperature);
-                                if (temperature > 45) {
-                                    System.out.println("Above Threshold handling alarm");
-                                    senderPool.submit(() -> handleTemperatureAlarm(ownMulticastId, dataAddress, temperature));
-                                } else {
-                                    handleTemperatureBelowThreshold(ownMulticastId, dataAddress);
-                                }
+
+                                // Create and initialize Easy Rules engine
+                                Facts facts = new Facts();
+                                facts.put("temperature", temperature);
+
+                                Rules rules = new Rules();
+                                rules.register(new TemperatureAboveThresholdRule());
+                                rules.register(new TemperatureBelowThresholdRule());
+
+                                RulesEngine rulesEngine = new DefaultRulesEngine();
+                                rulesEngine.fire(rules, facts);
                             }
                         } else if (("alarm p1".equals(request) || "alarm p2".equals(request) || "alarm p3".equals(request)) && uniqueId != ownMulticastId) {
                             String payloadDataAddress = payload.getDataAddress();
@@ -214,6 +227,35 @@ public class SensorMulticastReceiver implements Runnable {
             System.out.println("Latency from receiving to consensus for multicast ID " + uniqueId + ": " + latency + " ms");
         } else {
             System.out.println("Receive timestamp not found for multicast ID: " + uniqueId);
+        }
+    }
+
+    // Easy Rules: TemperatureAboveThresholdRule
+    @org.jeasy.rules.annotation.Rule
+    public class TemperatureAboveThresholdRule {
+        @Condition
+        public boolean isTemperatureAboveThreshold(@Fact("temperature") int temperature) {
+            return temperature > 45;
+        }
+
+        @Action
+        public void handleAboveThreshold(@Fact("temperature") int temperature) {
+            System.out.println("Above Threshold handling alarm");
+            senderPool.submit(() -> handleTemperatureAlarm(nodeConfig.getMulticastId(), dataIdAddress, temperature));
+        }
+    }
+
+    // Easy Rules: TemperatureBelowThresholdRule
+    @org.jeasy.rules.annotation.Rule
+    public class TemperatureBelowThresholdRule {
+        @Condition
+        public boolean isTemperatureBelowThreshold(@Fact("temperature") int temperature) {
+            return temperature <= 45;
+        }
+
+        @Action
+        public void handleBelowThreshold() {
+            handleTemperatureBelowThreshold(nodeConfig.getMulticastId(), dataIdAddress);
         }
     }
 }
