@@ -16,6 +16,7 @@ public class MulticastMessagePrinter implements Runnable {
     private static final String MULTICAST_GROUP = "230.0.0.1";
     private static final int MULTICAST_PORT = 4446;
     private static List<Long> latencies = new ArrayList<>();
+    private static int messageCount = 0;
 
     @Override
     public void run() {
@@ -38,6 +39,10 @@ public class MulticastMessagePrinter implements Runnable {
 
                     SensorDataPayload receivedPayload = (SensorDataPayload) objectInputStream.readObject();
                     System.out.println("Received message from Node: " + receivedPayload.getUniqueId() + " Alarm type " + receivedPayload.getRequest());
+
+                    // Increment and print the message count
+                    messageCount++;
+                    System.out.println("Total messages received: " + messageCount);
 
                     // Calculate the latency using the stored send timestamp
                     int multicastId = receivedPayload.getUniqueId();

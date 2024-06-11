@@ -33,21 +33,21 @@ public class KademliaMatrix {
     }
 
     public void activateAlarmById(int multicastId, String dataAddress) {
-        System.out.println(dataAddress);
+       // System.out.println(dataAddress);
         int[] position = findPositionById(multicastId);
         if (position != null) {
             activateAlarm(position[0], position[1], dataAddress);
         } else {
-            System.out.println("No node with multicast ID " + multicastId);
+           // System.out.println("No node with multicast ID " + multicastId);
         }
     }
 
     private void activateAlarm(int row, int col, String dataAddress) {
         if (isValidPosition(row, col)) {
-            System.out.println(dataAddress);
+            //System.out.println(dataAddress);
             alarmStates[row][col].setAlarmState(true);
             alarmStates[row][col].setDataAddress(dataAddress);
-            System.out.println("Activating alarm on [" + row + "][" + col + "] with data address " + dataAddress);
+            //System.out.println("Activating alarm on [" + row + "][" + col + "] with data address " + dataAddress);
         }
     }
 
@@ -59,14 +59,14 @@ public class KademliaMatrix {
                 nodeConfig.setCurrentAlarmTier(0);
             }
         } else {
-            System.out.println("No node with multicast ID " + multicastId);
+           // System.out.println("No node with multicast ID " + multicastId);
         }
     }
 
     private void deactivateAlarm(int row, int col) {
         if (isValidPosition(row, col)) {
             alarmStates[row][col].setAlarmState(false);
-            System.out.println("Deactivating alarm on [" + row + "][" + col + "]");
+            //System.out.println("Deactivating alarm on [" + row + "][" + col + "]");
         }
     }
 
@@ -94,20 +94,20 @@ public class KademliaMatrix {
                 int newCol = col + dir[1];
                 if (isValidPosition(newRow, newCol)) {
                     AlarmMatrixObject neighbor = alarmStates[newRow][newCol];
-                    System.out.println("Checking neighbor at [" + newRow + "][" + newCol + "]: " +
-                            "alarmState=" + neighbor.isAlarmState() +
-                            ", multicastId=" + neighbor.getMulticastId() +
-                            ", dataAddress=" + neighbor.getDataAddress());
+                   // System.out.println("Checking neighbor at [" + newRow + "][" + newCol + "]: " +
+                        //    "alarmState=" + neighbor.isAlarmState() +
+                          //  ", multicastId=" + neighbor.getMulticastId() +
+                           // ", dataAddress=" + neighbor.getDataAddress());
                     if (neighbor.isAlarmState()) {
                         alarmingNeighbors.add(neighbor);
-                        System.out.println("Adding Neighbour");
+                     //   System.out.println("Adding Neighbour");
                     }
                 }
             }
         } else {
-            System.out.println("Own multicast ID position not found in matrix");
+          //  System.out.println("Own multicast ID position not found in matrix");
         }
-        System.out.println("Alarming neighbors found: " + alarmingNeighbors.size());
+        //System.out.println("Alarming neighbors found: " + alarmingNeighbors.size());
         return alarmingNeighbors;
     }
 

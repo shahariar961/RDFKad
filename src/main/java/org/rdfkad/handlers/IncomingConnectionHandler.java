@@ -1,8 +1,10 @@
 package org.rdfkad.handlers;
 
 import org.rdfkad.functions.IDGenerator;
+import org.rdfkad.multicast.SensorMulticastReceiver;
 import org.rdfkad.multicast.SensorMulticastSender;
 import org.rdfkad.packets.Payload;
+import org.rdfkad.packets.RDFPacket;
 import org.rdfkad.packets.SensorDataPayload;
 import org.rdfkad.packets.RoutingPacket;
 import org.rdfkad.tables.DataTable;
@@ -25,6 +27,8 @@ public class IncomingConnectionHandler implements Runnable {
     private DataFinder dataFinder = new DataFinder();
     private String ownNodeId;
     private NodeConfig nodeConfig = NodeConfig.getInstance();
+    private RDFDataHandler rdfDataHandler = new RDFDataHandler();
+    private SensorMulticastReceiver sensorMulticastReceiver = new SensorMulticastReceiver();
 
     private Socket socket;
     private final int Threshold = 45;
@@ -51,6 +55,26 @@ public class IncomingConnectionHandler implements Runnable {
 
             if (receivedObject instanceof SensorDataPayload) {
                 SensorDataPayload payload = (SensorDataPayload) receivedObject;
+                int uniqueId = payload.getUniqueId();
+                int ownMulticastId = nodeConfig.getMulticastId();
+                String request = payload.getRequest();
+
+                if ("sensor info".equals(request)) {
+                    System.out.println("Received sensor data from multicast group");
+                    if (ownMulticastId == uniqueId) {
+                        RDFPacket rdfData = payload.getRdfData();
+                        int temperature = Integer.parseInt(rdfData.getObject());
+                        String dataAddress = rdfDataHandler.storeRDF(rdfData);
+                        if (temperature > 45) {
+                            sensorMulticastReceiver.handleTemperatureAlarm(ownMulticastId,dataAddress, temperature);
+                        }else {
+                            sensorMulticastReceiver.handleTemperatureBelowThreshold(ownMulticastId,dataAddress);
+                        }
+                    }
+                } else {
+                    System.out.println("Forwarding sensor data to multicast group");
+                    forwardToMulticastGroup(payload);
+                }
                 forwardToMulticastGroup(payload);
             } else if (receivedObject instanceof Payload) {
                 Payload receivedPayload = (Payload) receivedObject;
@@ -107,7 +131,7 @@ public class IncomingConnectionHandler implements Runnable {
 
     private void handleStoreRequest(Payload receivedPayload, ObjectOutputStream outputStream) throws IOException {
         dataTable.put(receivedPayload.getDataId(), receivedPayload.getDataValue());
-        System.out.println("Data id " + receivedPayload.getDataId() + " stored successfully");
+        //System.out.println("Data id " + receivedPayload.getDataId() + " stored successfully");
         Payload messagePayload = new Payload("stored", receivedPayload.getNodeId(), receivedPayload.getPort(), receivedPayload.getDataId());
         outputStream.writeObject(messagePayload);
     }
@@ -132,31 +156,17 @@ public class IncomingConnectionHandler implements Runnable {
         if (objectValue > Threshold) {
             Payload messagePayload = new Payload("ok consensus", receivedPayload.getNodeId(), receivedPayload.getPort(), receivedPayload.getDataId());
             outputStream.writeObject(messagePayload);
-            System.out.println("Consensus lookup successful");
+           // System.out.println("Consensus lookup successful");
         } else {
             Payload messagePayload = new Payload("no consensus", receivedPayload.getNodeId(), receivedPayload.getPort(), receivedPayload.getDataId());
             outputStream.writeObject(messagePayload);
-            System.out.println("Consensus lookup failed");
+            //System.out.println("Consensus lookup failed");
         }
 
     }
 
 
     private void forwardToMulticastGroup(SensorDataPayload payload) {
-//        try (MulticastSocket multicastSocket = new MulticastSocket(MULTICAST_PORT)) {
-//            InetAddress group = InetAddress.getByName(MULTICAST_GROUP);
-//
-//            // Serialize the payload
-//            ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-//            ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream);
-//            objectOutputStream.writeObject(payload);
-//            objectOutputStream.flush();
-//            byte[] buf = byteArrayOutputStream.toByteArray();
-//
-//            // Send the packet to the multicast group
-//            DatagramPacket packet = new DatagramPacket(buf, buf.length, group, MULTICAST_PORT);
-//            multicastSocket.send(packet);
-//            System.out.println("Forwarded message to multicast group");
         try {
         SensorMulticastSender.sensorDataMessageSender(payload.getUniqueId(), payload.getDataAddress(), payload.getRequest());
     } catch (NumberFormatException e) {

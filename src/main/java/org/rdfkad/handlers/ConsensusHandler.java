@@ -52,7 +52,7 @@ public class ConsensusHandler {
             return true; // Wait for all consensus requests to complete
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            System.out.println("Latch interrupted: " + e.getMessage());
+            //System.out.println("Latch interrupted: " + e.getMessage());
             return false;
         }
     }
@@ -78,9 +78,9 @@ public class ConsensusHandler {
                 throw new Exception("Consensus request failed.");
             }
         } catch (IOException e) {
-            System.out.println("Error sending consensus request: " + e.getMessage());
+            //System.out.println("Error sending consensus request: " + e.getMessage());
         } catch (Exception e) {
-            System.out.println(e.getMessage());
+            //System.out.println(e.getMessage());
         }
     }
 }

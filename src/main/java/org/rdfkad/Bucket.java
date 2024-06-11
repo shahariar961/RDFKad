@@ -67,6 +67,6 @@
         // Adjusted to a 12-bit identifier space
         public static int getLeadingZeros(BigInteger distance) {
             int highestSetBit = distance.bitLength() - 1;
-            return 11 - highestSetBit;
+            return 23 - highestSetBit;
         }
     }

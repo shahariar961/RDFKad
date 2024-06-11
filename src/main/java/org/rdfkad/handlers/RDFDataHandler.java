@@ -42,7 +42,7 @@ public class RDFDataHandler {
             String compositeValue = String.join(",", subjectHash, predicateHash, objectHash);
             dataTable.put(packetHash, compositeValue);
             dataHandler.sendData(packetHash, compositeValue);
-            System.out.println("Composite Data ID :" + packetHash);
+            //System.out.println("Composite Data ID :" + packetHash);
 
 
         } catch (NoSuchAlgorithmException e) {

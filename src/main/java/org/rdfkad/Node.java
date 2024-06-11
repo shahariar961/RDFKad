@@ -56,7 +56,7 @@ public class Node {
         while (true) {
             try {
                 Socket clientSocket = serverSocket.accept();
-                System.out.println("Accepted connection from Node on port " + clientSocket.getPort());
+                //System.out.println("Accepted connection from Node on port " + clientSocket.getPort());
                 IncomingConnectionHandler connectionHandler = new IncomingConnectionHandler(clientSocket);
                 connectionPool.submit(connectionHandler::handleConnection);
             } catch (IOException e) {

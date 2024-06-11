@@ -45,7 +45,7 @@ public class DataFinder {
             dataValue = dataTable.get(dataId).toString();
 
         }
-        System.out.println("Data value: " + dataValue);
+        //System.out.println("Data value: " + dataValue);
         return dataValue;
 
     }
@@ -59,7 +59,7 @@ public class DataFinder {
 
         if (dataTable.containsKey(compositeDataId)) {
             compositeValue = dataTable.get(compositeDataId).toString();
-            System.out.println("Composite data value: " + compositeValue);
+            //System.out.println("Composite data value: " + compositeValue);
             String[] dataIds = compositeValue.split(",");
             if (dataIds.length != 3) {
                 throw new IllegalArgumentException("Composite data value does not contain exactly three data IDs: " + compositeValue);
@@ -102,7 +102,7 @@ public class DataFinder {
             e.printStackTrace();
         }
         objectValue = dataTable.get(objectId).toString();
-        System.out.println("Object value: " + objectValue);
+        //System.out.println("Object value: " + objectValue);
         return objectValue;
 
     }

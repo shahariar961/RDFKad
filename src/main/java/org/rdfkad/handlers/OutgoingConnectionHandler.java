@@ -2,6 +2,7 @@ package org.rdfkad.handlers;
 
 import org.rdfkad.packets.Payload;
 import org.rdfkad.packets.RoutingPacket;
+import org.rdfkad.packets.SensorDataPayload;
 import org.rdfkad.tables.DataTable;
 import org.rdfkad.tables.NodeConfig;
 import org.rdfkad.tables.RoutingTable;
@@ -50,6 +51,18 @@ public class OutgoingConnectionHandler {
         }
         return null;
     }
+    public String connectToNode( RoutingPacket routingPacket, SensorDataPayload payload) throws IOException {
+        if (routingPacket == null) {
+            throw new IOException("No routing information available for nodeId: ");
+        }
+        try (Socket socket = new Socket(routingPacket.getHost(), routingPacket.getPort());
+             ObjectOutputStream outputStream = new ObjectOutputStream(socket.getOutputStream());) {
+
+            outputStream.writeObject(payload);
+        } catch (IOException ignored) {
+        }
+        return null;
+    }
 
     public String connectToNode(String request, RoutingPacket routingPacket, String dataId) throws IOException {
         if (routingPacket == null) {
@@ -87,21 +100,21 @@ public class OutgoingConnectionHandler {
     private boolean handleReceivedPayload(Payload receivedPayload, String dataId) {
         switch (receivedPayload.getRequest()) {
             case "stored":
-                System.out.println("Stored Successfully Data Id " + receivedPayload.getDataId() + " at Node: " + receivedPayload.getNodeId());
+               // System.out.println("Stored Successfully Data Id " + receivedPayload.getDataId() + " at Node: " + receivedPayload.getNodeId());
                 break;
             case "found":
                 Map<String, Object> data = receivedPayload.getData();
                 Object dataValue = data.get(dataId);
                 dataTable.put(dataId, dataValue);
-                System.out.println("Data found: " + dataValue);
+               // System.out.println("Data found: " + dataValue);
                 return true;
 
             case "not found":
-                System.out.println("Data not found");
+               // System.out.println("Data not found");
                 return false;
 
             case "ok consensus":
-                System.out.println("Consensus reached for Data Id " + receivedPayload.getDataId() + " at Node: " + receivedPayload.getNodeId());
+               // System.out.println("Consensus reached for Data Id " + receivedPayload.getDataId() + " at Node: " + receivedPayload.getNodeId());
                 return true;
 
             case "no consensus":

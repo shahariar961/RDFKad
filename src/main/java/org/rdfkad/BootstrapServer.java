@@ -6,23 +6,23 @@ import org.rdfkad.multicast.MulticastMessagePrinter;
 import org.rdfkad.multicast.SensorMulticastSender;
 import org.rdfkad.multicast.SensorMulticastServer;
 import org.rdfkad.packets.RoutingPacket;
+import org.rdfkad.packets.SensorDataPayload;
 import org.rdfkad.tables.RoutingTable;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class BootstrapServer {
     private static ConcurrentHashMap<String, RoutingPacket> routingTable = RoutingTable.getInstance().getMap();
+
     private static final int BIT_SPACE = 12;
     public ServerSocket serverSocket;
     private static final String MULTICAST_GROUP = "230.0.0.1";
@@ -103,7 +103,22 @@ public class BootstrapServer {
                     } catch (NumberFormatException e) {
                         System.out.println("Invalid count. Please provide a numeric value.");
                     }
-                } else if (command.startsWith("show routing")) {
+                }else if (command.startsWith("generate data ")) {
+                    String[] tokens = command.split(" ");
+                    if (tokens.length != 3) {
+                        System.out.println("Invalid command format. Expected: send random integer <count>");
+                        continue;
+                    }
+                    try {
+                        int count = Integer.parseInt(tokens[2]);
+                        RandomSensorData(count);
+                    } catch (NumberFormatException e) {
+                        System.out.println("Invalid count. Please provide a numeric value.");
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+                else if (command.startsWith("show routing")) {
                     if (routingTable.isEmpty()) {
                         System.out.println("Routing table is empty");
                     } else {
@@ -142,10 +157,35 @@ public class BootstrapServer {
 
     private static void sendRandomSensorData(int count) {
         for (int i = 0; i < count; i++) {
-            int randomId = random.nextInt(40) + 1; // Random multicast ID between 1 and 40
-            int randomTemperature = random.nextBoolean() ? 35 : 50;
+            int randomId = random.nextInt(36) + 1; // Random multicast ID between 1 and 40
+            int randomTemperature = random.nextBoolean() ? 35 : 50;//random.nextBoolean() ? 35 : 50;
             SensorMulticastSender.sensorDataMessageSender(randomId, randomTemperature, "sensor info");
             System.out.println("Sent random data to multicast ID " + randomId + " with temperature " + randomTemperature);
+        }
+        System.out.println("Sent " + count + " random data messages.");
+    }
+    private static void RandomSensorData(int count) throws IOException, InterruptedException {
+        routingTable = RoutingTable.getInstance().getMap();
+        List<String> keys = new ArrayList<>(routingTable.keySet());
+        for (int i = 0; i < count; i++) {
+            if (keys.size() == 0) {
+                System.out.println("Routing table is empty. Cannot send data.");
+                return;
+            }
+            int randomIndex = random.nextInt(keys.size()); // Random index between 0 and size of routing table
+            String randomKey = keys.get(randomIndex); // Get a random key from the routing table
+            RoutingPacket routingPacket = routingTable.get(randomKey); // Get the corresponding RoutingPacket
+
+            int randomTemperature = random.nextBoolean() ? 35 : 50;
+            SensorDataPayload payload = new SensorDataPayload(routingPacket.getMulticastId(), String.valueOf(randomTemperature),"sensor info");
+             OutgoingConnectionHandler outgoingConnectionHandler = new OutgoingConnectionHandler();
+            outgoingConnectionHandler.connectToNode( routingPacket, payload);
+            //Thread.sleep(200);
+                //System.out.println("Sent unicast message to bootstrap server");
+                //System.out.println("Error sending unicast message: " + e.getMessage());
+
+            //System.out.println("Sent random data to Node ID " + randomKey + " with temperature " + randomTemperature);
+
         }
         System.out.println("Sent " + count + " random data messages.");
     }

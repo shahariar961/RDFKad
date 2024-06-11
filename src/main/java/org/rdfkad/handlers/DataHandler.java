@@ -39,7 +39,7 @@ public class DataHandler {
 
         // Check if the target bucket is empty or not
         if (targetBucket != null && !targetBucket.isEmpty()) {
-            System.out.println("Accessing bucket index");
+            //System.out.println("Accessing bucket index");
             for (String otherNodeId : targetBucket) {
                 BigInteger distance = XOR.Distance(dataId, otherNodeId);
                 // Compare distances, and skip updating if the node is itself
@@ -65,12 +65,12 @@ public class DataHandler {
 
         // If no closest node is found, or the closest node is the local node itself
         if (closestNodeId == null || smallestDistance.equals(xorDistance)) {
-            System.out.println("Data ID is closest to the local node. Storing only locally.");
+            //System.out.println("Data ID is closest to the local node. Storing only locally.");
             // Store the data locally
             // Example: localDataStore.put(dataId, payload);
         } else {
             RoutingPacket routingPacket = RoutingTable.getInstance().getMap().get(closestNodeId);
-            System.out.println("Data ID is closest to node " + closestNodeId + ". Forwarding to node " + routingPacket.getHost() + ":" + routingPacket.getPort());
+            //System.out.println("Data ID is closest to node " + closestNodeId + ". Forwarding to node " + routingPacket.getHost() + ":" + routingPacket.getPort());
             OutgoingConnectionHandler outgoingConnectionHandler = new OutgoingConnectionHandler();
             outgoingConnectionHandler.connectToNode("store", routingPacket, dataId);
         }

@@ -19,7 +19,7 @@ public class RDFPacketSender {
 
 //            String serializedPacket = packet.serialize();
             oos.writeObject(packet);
-            System.out.println("RDF Packet sent: " + packet);
+           // System.out.println("RDF Packet sent: " + packet);
 
         } catch (IOException e) {
             System.err.println("Error sending RDF packet: " + e.getMessage());
