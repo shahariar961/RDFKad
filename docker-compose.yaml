@@ -1,0 +1,27 @@
+version: '3.9'
+
+services:
+  node:
+    build: .
+    environment:
+      - MULTICAST_GROUP=230.0.0.1
+      - MULTICAST_PORT=4446
+      - BOOTSTRAP_SERVER_HOST=host.docker.internal
+      - BOOTSTRAP_SERVER_PORT=9090
+    networks:
+      my_network:
+        aliases:
+          - node
+    deploy:
+      mode: replicated
+      replicas: 5
+    ports:
+      - target: 8080
+        protocol: tcp
+        mode: host
+
+networks:
+  my_network:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.enable_multicast: "true"
